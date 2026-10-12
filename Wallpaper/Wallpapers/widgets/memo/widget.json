@@ -1,0 +1,13 @@
+{
+  "name": "메모",
+  "description": "짧은 글을 바탕화면에 띄운다.",
+  "width": 520,
+  "height": 140,
+  "interval": 60,
+  "params": {
+    "text": { "type": "text", "label": "내용", "default": "오늘도 좋은 하루" },
+    "color": { "type": "color", "label": "글자 색", "default": "#F0F1F4" },
+    "size": { "type": "number", "label": "글자 크기", "default": 44, "min": 12, "max": 120 },
+    "align": { "type": "choice", "label": "정렬", "default": "가운데", "choices": { "왼쪽": "Left", "가운데": "Center", "오른쪽": "Right" } }
+  }
+}

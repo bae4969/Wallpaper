@@ -1,0 +1,47 @@
+{
+  "description": "빗방울 맺힌 유리. 아래 레이어 전체를 굴절·흐림 처리해 다시 그린다. 이 레이어보다 뒤에 둔 레이어는 유리 앞에 선명하게 보인다.",
+  "kind": "post",
+  "blend": "opaque",
+  "params": {
+    "density": {
+      "slot": "P0.x",
+      "default": 0.35,
+      "description": "작은 방울 밀도 0~1"
+    },
+    "refraction": {
+      "slot": "P0.y",
+      "default": 1.2,
+      "description": "방울 굴절 세기"
+    },
+    "blur": {
+      "slot": "P0.z",
+      "default": 2.5,
+      "description": "김 서린 유리 흐림(mip 단계)"
+    },
+    "darken": {
+      "slot": "P0.w",
+      "default": 0.25,
+      "description": "김 서린 부분 색조 섞임 0~1"
+    },
+    "tint": {
+      "slot": "P1.rgb",
+      "default": "#FFFFFF",
+      "description": "김 서린 부분 색조"
+    },
+    "dropSize": {
+      "slot": "P2.x",
+      "default": 28,
+      "description": "방울 크기 px"
+    },
+    "slideSpeed": {
+      "slot": "P2.y",
+      "default": 1.4,
+      "description": "흘러내리는 속도"
+    },
+    "slideSpacing": {
+      "slot": "P2.z",
+      "default": 3,
+      "description": "흘러내리는 줄 간격(방울 크기 배수)"
+    }
+  }
+}

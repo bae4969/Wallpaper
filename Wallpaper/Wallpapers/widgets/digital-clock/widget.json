@@ -1,0 +1,16 @@
+{
+  "name": "디지털 시계",
+  "description": "큰 숫자 시계와 날짜. 형식·색·크기를 고를 수 있다.",
+  "width": 620,
+  "height": 220,
+  "interval": 1,
+  "params": {
+    "format": { "type": "choice", "label": "시간 형식", "default": "24시간",
+      "choices": { "24시간 · 초": "HH:mm:ss", "24시간": "HH:mm", "12시간": "tt h:mm", "12시간 · 초": "tt h:mm:ss" } },
+    "dateFormat": { "type": "choice", "label": "날짜 형식", "default": "10월 12일 월요일",
+      "choices": { "10월 12일 월요일": "M월 d일 dddd", "2026. 10. 12.": "yyyy. M. d.", "표시 안 함": "" } },
+    "color": { "type": "color", "label": "시간 색", "default": "#F0F1F4" },
+    "accent": { "type": "color", "label": "날짜 색", "default": "#C4B5FD" },
+    "size": { "type": "number", "label": "시간 글자 크기", "default": 130, "min": 40, "max": 200, "description": "위젯 크기에 맞지 않으면 자동으로 줄어든다." }
+  }
+}

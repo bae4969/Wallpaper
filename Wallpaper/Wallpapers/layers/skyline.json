@@ -1,0 +1,97 @@
+{
+  "description": "생성형 빌딩 실루엣과 깜박이는 창문 불빛. seed 로 배치가 바뀐다. 여러 겹 쌓아 원근감을 낸다.",
+  "kind": "fullscreen",
+  "blend": "alpha",
+  "params": {
+    "color": {
+      "slot": "P0.rgb",
+      "default": "#000000",
+      "description": "건물 색"
+    },
+    "opacity": {
+      "slot": "P0.a",
+      "default": 1,
+      "description": "건물 불투명도"
+    },
+    "windowA": {
+      "slot": "P1.rgb",
+      "default": "#FFFFFF",
+      "description": "창문 색 A"
+    },
+    "windowABrightness": {
+      "slot": "P1.a",
+      "default": 1,
+      "description": "창문 A 밝기"
+    },
+    "windowB": {
+      "slot": "P2.rgb",
+      "default": "#FFFFFF",
+      "description": "창문 색 B"
+    },
+    "windowBBrightness": {
+      "slot": "P2.a",
+      "default": 1,
+      "description": "창문 B 밝기"
+    },
+    "ground": {
+      "slot": "P3.x",
+      "default": 1,
+      "description": "건물 바닥 높이(0=위, 1=아래, 1보다 크면 화면 밖)"
+    },
+    "minHeight": {
+      "slot": "P3.y",
+      "default": 0.1,
+      "description": "최소 건물 높이(화면 높이 비율)"
+    },
+    "maxHeight": {
+      "slot": "P3.z",
+      "default": 0.4,
+      "description": "최대 건물 높이"
+    },
+    "buildingWidth": {
+      "slot": "P3.w",
+      "default": 80,
+      "description": "건물 폭 px(1080p 기준)"
+    },
+    "lit": {
+      "slot": "P4.x",
+      "default": 0.3,
+      "description": "켜진 창문 비율 0~1"
+    },
+    "twinkle": {
+      "slot": "P4.y",
+      "default": 0.05,
+      "description": "창문이 켜지고 꺼지는 속도"
+    },
+    "haze": {
+      "slot": "P4.w",
+      "default": 0,
+      "description": "안개 색과 섞는 정도 0~1(멀수록 크게)"
+    },
+    "hazeColor": {
+      "slot": "P5.rgb",
+      "default": "#000000",
+      "description": "안개 색"
+    },
+    "cellWidth": {
+      "slot": "P6.x",
+      "default": 8,
+      "description": "창문 칸 폭 px"
+    },
+    "cellHeight": {
+      "slot": "P6.y",
+      "default": 12,
+      "description": "창문 칸 높이 px"
+    },
+    "marginX": {
+      "slot": "P6.z",
+      "default": 0.25,
+      "description": "창문 칸 가로 여백 비율"
+    },
+    "marginY": {
+      "slot": "P6.w",
+      "default": 0.3,
+      "description": "창문 칸 세로 여백 비율"
+    }
+  }
+}

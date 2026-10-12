@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Wallpaper</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+
+    <!-- x64 전용 · 런타임 포함 · 압축 단일 exe -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <SatelliteResourceLanguages>ko</SatelliteResourceLanguages>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="LinuxMetrics.py" LogicalName="Wallpaper.LinuxMetrics.py" />
+    <EmbeddedResource Include="app.ico" LogicalName="Wallpaper.app.ico" />
+    <EmbeddedResource Include="WidgetShaders.hlsl" LogicalName="Wallpaper.WidgetShaders.hlsl" />
+    <!-- 움직이는 배경 스크립트 기본본: 첫 실행 때 %LOCALAPPDATA%\Wallpaper\Wallpapers 로 풀린다 -->
+    <EmbeddedResource Include="Wallpapers\**\*" LogicalName="Wallpaper.Wallpapers/%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- 위젯 XAML 은 실행 중에 읽는 스크립트라 컴파일하지 않는다 -->
+    <Page Remove="Wallpapers\**\*.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 움직이는 배경(D3D11) -->
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
+    <!-- 트레이 아이콘 + WPF 다크 메뉴(ai_agent와 동일) -->
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.2.0" />
+  </ItemGroup>
+
+</Project>

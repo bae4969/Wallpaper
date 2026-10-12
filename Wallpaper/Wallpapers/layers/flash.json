@@ -1,0 +1,22 @@
+{
+  "description": "불규칙한 번개 섬광(더하기 혼합).",
+  "kind": "fullscreen",
+  "blend": "add",
+  "params": {
+    "color": {
+      "slot": "P0.rgb",
+      "default": "#FFFFFF",
+      "description": "섬광 색"
+    },
+    "intensity": {
+      "slot": "P0.a",
+      "default": 0.4,
+      "description": "세기"
+    },
+    "interval": {
+      "slot": "P1.x",
+      "default": 12,
+      "description": "평균 간격 초"
+    }
+  }
+}

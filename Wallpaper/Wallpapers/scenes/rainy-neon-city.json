@@ -1,0 +1,17 @@
+{
+  "name": "비 오는 네온 도시",
+  "description": "비 내리는 밤, 김 서린 창문 너머 네온 도시. 빌딩 두 겹·보케 두 겹·빗줄기·안개·번개·빗방울 유리.",
+  "layers": [
+    {"type": "gradient", "top": "#07061A", "bottom": "#1C1036", "glow": "#FF3D8B", "glowStrength": 0.22, "glowCenter": 0.74, "glowWidth": 0.2},
+    {"type": "skyline", "seed": 3, "color": "#1C1633", "opacity": 1, "windowA": "#FFB86B", "windowABrightness": 0.7, "windowB": "#7FD4FF", "windowBBrightness": 0.6, "ground": 0.8, "minHeight": 0.12, "maxHeight": 0.4, "buildingWidth": 72, "lit": 0.32, "twinkle": 0.05, "haze": 0.5, "hazeColor": "#2C1C48", "cellWidth": 8, "cellHeight": 12, "marginX": 0.25, "marginY": 0.3},
+    {"type": "particles", "seed": 1, "count": 70, "shape": "bokeh", "blend": "add", "colorA": "#FF4FA3", "colorB": "#3FE0FF", "colorC": "#FFB347", "weightC": 0.6, "minSize": 26, "maxSize": 100, "opacity": 0.32, "velocityX": 0.002, "velocityY": -0.0015, "speedJitter": 0.5, "twinkle": 0.6, "top": 0.35, "bottom": 1.0, "weightB": 1},
+    {"type": "skyline", "seed": 11, "color": "#0B0916", "opacity": 1, "windowA": "#FFD08A", "windowABrightness": 0.85, "windowB": "#FF5FA8", "windowBBrightness": 0.75, "ground": 1.02, "minHeight": 0.2, "maxHeight": 0.58, "buildingWidth": 150, "lit": 0.28, "twinkle": 0.08, "haze": 0.1, "hazeColor": "#1A1030", "cellWidth": 14, "cellHeight": 20, "marginX": 0.22, "marginY": 0.28},
+    {"type": "particles", "seed": 2, "count": 16, "shape": "bokeh", "blend": "add", "colorA": "#FF4FA3", "colorB": "#3FE0FF", "colorC": "#B58CFF", "minSize": 150, "maxSize": 330, "opacity": 0.16, "velocityX": -0.003, "velocityY": 0.001, "speedJitter": 0.6, "twinkle": 0.4, "top": 0.4, "bottom": 1.05, "weightB": 1, "weightC": 1},
+    {"type": "particles", "seed": 3, "count": 650, "shape": "streak", "blend": "add", "colorA": "#9FB3FF", "colorB": "#C9B8FF", "weightB": 0.5, "minSize": 1.2, "maxSize": 2.0, "opacity": 0.38, "velocityX": 0.03, "velocityY": 1.4, "speedJitter": 0.3, "length": 42, "top": -0.1, "bottom": 1.1},
+    {"type": "fog", "seed": 5, "color": "#3A2A5C", "opacity": 0.32, "scale": 2.2, "flowX": 0.02, "flowY": 0.004, "bottomBias": 0.6},
+    {"type": "flash", "color": "#C8C0FF", "intensity": 0.45, "interval": 14, "seed": 2},
+    {"type": "glass", "seed": 6, "density": 0.35, "refraction": 1.2, "blur": 1.3, "darken": 0.25, "tint": "#B9B0D8", "dropSize": 28, "slideSpeed": 1.4, "slideSpacing": 3},
+    {"type": "particles", "seed": 4, "count": 120, "shape": "streak", "blend": "add", "colorA": "#B8C4FF", "colorB": "#E0D6FF", "weightB": 0.5, "minSize": 2.0, "maxSize": 3.2, "opacity": 0.28, "velocityX": 0.05, "velocityY": 2.2, "speedJitter": 0.3, "length": 95, "top": -0.1, "bottom": 1.1},
+    {"type": "vignette", "strength": 0.55, "radius": 0.45, "softness": 0.7}
+  ]
+}

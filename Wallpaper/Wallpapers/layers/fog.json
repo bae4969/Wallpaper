@@ -1,0 +1,37 @@
+{
+  "description": "흐르는 안개(잡음).",
+  "kind": "fullscreen",
+  "blend": "alpha",
+  "params": {
+    "color": {
+      "slot": "P0.rgb",
+      "default": "#FFFFFF",
+      "description": "안개 색"
+    },
+    "opacity": {
+      "slot": "P0.a",
+      "default": 0.3,
+      "description": "불투명도"
+    },
+    "scale": {
+      "slot": "P1.x",
+      "default": 2,
+      "description": "무늬 크기(클수록 잘게)"
+    },
+    "flowX": {
+      "slot": "P1.y",
+      "default": 0.02,
+      "description": "가로 흐름 속도"
+    },
+    "flowY": {
+      "slot": "P1.z",
+      "default": 0,
+      "description": "세로 흐름 속도"
+    },
+    "bottomBias": {
+      "slot": "P1.w",
+      "default": 0.5,
+      "description": "아래쪽으로 몰리는 정도 0~1"
+    }
+  }
+}

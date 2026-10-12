@@ -1,0 +1,22 @@
+{
+  "description": "화면 가장자리를 어둡게.",
+  "kind": "fullscreen",
+  "blend": "alpha",
+  "params": {
+    "strength": {
+      "slot": "P0.x",
+      "default": 0.5,
+      "description": "세기 0~1"
+    },
+    "radius": {
+      "slot": "P0.y",
+      "default": 0.45,
+      "description": "어두워지기 시작하는 반경"
+    },
+    "softness": {
+      "slot": "P0.z",
+      "default": 0.7,
+      "description": "부드러움"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "description": "하늘 그라데이션과 지평선 빛 번짐. 보통 맨 아래 레이어.",
+  "kind": "fullscreen",
+  "blend": "opaque",
+  "params": {
+    "top": {
+      "slot": "P0.rgb",
+      "default": "#000000",
+      "description": "화면 위쪽 색"
+    },
+    "bottom": {
+      "slot": "P1.rgb",
+      "default": "#000000",
+      "description": "화면 아래쪽 색"
+    },
+    "glow": {
+      "slot": "P2.rgb",
+      "default": "#000000",
+      "description": "빛 번짐 색"
+    },
+    "glowStrength": {
+      "slot": "P2.a",
+      "default": 0,
+      "description": "빛 번짐 세기 0~1"
+    },
+    "glowCenter": {
+      "slot": "P3.x",
+      "default": 0.7,
+      "description": "빛 번짐 중심 높이(0=위, 1=아래)"
+    },
+    "glowWidth": {
+      "slot": "P3.y",
+      "default": 0.2,
+      "description": "빛 번짐 폭(화면 높이 비율)"
+    }
+  }
+}

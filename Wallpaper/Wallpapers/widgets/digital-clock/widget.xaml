@@ -1,0 +1,27 @@
+<!-- 디지털 시계: 시간 형식·날짜 형식은 선택지 값(.NET 날짜 형식 문자열)을 Converters.Format 에 넘겨 표시한다. -->
+<Grid xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:w="clr-namespace:Wallpaper.Scripting;assembly=Wallpaper">
+  <Viewbox StretchDirection="DownOnly">
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+      <TextBlock HorizontalAlignment="Center" FontFamily="Segoe UI Variable Display, Segoe UI" FontWeight="SemiBold"
+                 Foreground="{Binding Params[color]}" FontSize="{Binding Params[size]}">
+        <TextBlock.Text>
+          <MultiBinding Converter="{x:Static w:Converters.Format}">
+            <Binding Path="Now"/>
+            <Binding Path="Params[format]"/>
+          </MultiBinding>
+        </TextBlock.Text>
+      </TextBlock>
+      <TextBlock HorizontalAlignment="Center" FontFamily="Segoe UI Variable Text, Malgun Gothic" FontSize="28" Margin="0,-6,0,0"
+                 Foreground="{Binding Params[accent]}">
+        <TextBlock.Text>
+          <MultiBinding Converter="{x:Static w:Converters.Format}">
+            <Binding Path="Now"/>
+            <Binding Path="Params[dateFormat]"/>
+          </MultiBinding>
+        </TextBlock.Text>
+      </TextBlock>
+    </StackPanel>
+  </Viewbox>
+</Grid>

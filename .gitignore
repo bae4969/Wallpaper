@@ -1,0 +1,13 @@
+temp/
+CLAUDE.md
+AGENTS.md
+.claude
+.agents/
+.codex/hooks.json
+
+# 하네스 매니페스트·codex 설정
+manifest.json
+.codex/
+
+# 빌드 출력(build.ps1 → build/)
+build/

@@ -1,0 +1,7 @@
+<Project>
+  <!-- 중간 산출물(bin·obj)을 프로젝트 폴더 대신 상위 폴더의 build\obj 아래에 둔다 -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\build\obj\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)..\build\obj\bin\</BaseOutputPath>
+  </PropertyGroup>
+</Project>

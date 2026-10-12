@@ -1,0 +1,68 @@
+<!-- 시스템 상태: 막대는 0~1 비율(CpuRatio 등)을 ScaleTransform 으로 늘린다. -->
+<StackPanel xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:w="clr-namespace:Wallpaper.Scripting;assembly=Wallpaper"
+            VerticalAlignment="Center" TextElement.Foreground="{Binding Params[text]}"
+            TextElement.FontFamily="Segoe UI Variable Text, Malgun Gothic" TextElement.FontSize="17">
+  <StackPanel.Resources>
+    <Style TargetType="Border" x:Key="Track">
+      <Setter Property="Height" Value="8"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Background" Value="#33FFFFFF"/>
+      <Setter Property="Margin" Value="0,6,0,16"/>
+    </Style>
+  </StackPanel.Resources>
+
+  <Grid>
+    <TextBlock Text="CPU" FontWeight="SemiBold"/>
+    <TextBlock HorizontalAlignment="Right" Text="{Binding Cpu, StringFormat={}{0:0}%}"/>
+  </Grid>
+  <Border Style="{StaticResource Track}">
+    <Border CornerRadius="4" Background="{Binding Params[accent]}" HorizontalAlignment="Stretch" RenderTransformOrigin="0,0.5">
+      <Border.RenderTransform><ScaleTransform ScaleX="{Binding CpuRatio}"/></Border.RenderTransform>
+    </Border>
+  </Border>
+
+  <Grid>
+    <TextBlock Text="RAM" FontWeight="SemiBold"/>
+    <TextBlock HorizontalAlignment="Right">
+      <TextBlock.Text>
+        <MultiBinding StringFormat="{}{0:0.0} / {1:0.0} GB">
+          <Binding Path="RamUsedGB"/>
+          <Binding Path="RamTotalGB"/>
+        </MultiBinding>
+      </TextBlock.Text>
+    </TextBlock>
+  </Grid>
+  <Border Style="{StaticResource Track}">
+    <Border CornerRadius="4" Background="{Binding Params[accent]}" RenderTransformOrigin="0,0.5">
+      <Border.RenderTransform><ScaleTransform ScaleX="{Binding RamRatio}"/></Border.RenderTransform>
+    </Border>
+  </Border>
+
+  <StackPanel Visibility="{Binding Params[showGpu], Converter={x:Static w:Converters.Visible}}">
+    <StackPanel Visibility="{Binding HasGpu, Converter={x:Static w:Converters.Visible}}">
+      <Grid>
+        <TextBlock Text="GPU" FontWeight="SemiBold"/>
+        <TextBlock HorizontalAlignment="Right">
+          <TextBlock.Text>
+            <MultiBinding StringFormat="{}{0:0}% · {1:0.0} GB">
+              <Binding Path="Gpu.Usage"/>
+              <Binding Path="Gpu.MemoryUsedGB"/>
+            </MultiBinding>
+          </TextBlock.Text>
+        </TextBlock>
+      </Grid>
+      <Border Style="{StaticResource Track}">
+        <Border CornerRadius="4" Background="{Binding Params[accent]}" RenderTransformOrigin="0,0.5">
+          <Border.RenderTransform><ScaleTransform ScaleX="{Binding Gpu.UsageRatio}"/></Border.RenderTransform>
+        </Border>
+      </Border>
+    </StackPanel>
+  </StackPanel>
+
+  <Grid Visibility="{Binding Params[showNetwork], Converter={x:Static w:Converters.Visible}}" Opacity="0.85">
+    <TextBlock Text="{Binding DownloadText, StringFormat=↓ {0}}"/>
+    <TextBlock HorizontalAlignment="Right" Text="{Binding UploadText, StringFormat=↑ {0}}"/>
+  </Grid>
+</StackPanel>

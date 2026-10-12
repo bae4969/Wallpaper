@@ -1,0 +1,14 @@
+{
+  "name": "시스템 상태",
+  "description": "이 PC의 CPU·RAM·GPU 사용률 막대와 네트워크 속도(로컬 측정).",
+  "width": 360,
+  "height": 250,
+  "interval": 1,
+  "metrics": true,
+  "params": {
+    "accent": { "type": "color", "label": "막대 색", "default": "#C4B5FD" },
+    "text": { "type": "color", "label": "글자 색", "default": "#F0F1F4" },
+    "showGpu": { "type": "bool", "label": "GPU 표시", "default": true, "description": "NVIDIA GPU가 있을 때 첫 번째 GPU의 사용률·VRAM을 표시한다." },
+    "showNetwork": { "type": "bool", "label": "네트워크 표시", "default": true }
+  }
+}
