@@ -1,0 +1,102 @@
+{
+  "description": "부드럽게 흐르는 뭉게구름. 빛 방향에 따라 밝은 면·그늘·빛나는 가장자리가 생기고, 아래쪽(먼 하늘)은 원근으로 납작해진다. offsetX·flip 으로 다른 화면(수면 반사)과 무늬를 이어 붙인다.",
+  "kind": "fullscreen",
+  "blend": "alpha",
+  "params": {
+    "light": {
+      "slot": "P0.rgb",
+      "default": "#FFFFFF",
+      "description": "빛 받는 면 색"
+    },
+    "opacity": {
+      "slot": "P0.a",
+      "default": 0.95,
+      "description": "불투명도 0~1"
+    },
+    "shadow": {
+      "slot": "P1.rgb",
+      "default": "#8E9CB8",
+      "description": "그늘진 면 색"
+    },
+    "coverage": {
+      "slot": "P1.a",
+      "default": 0.5,
+      "description": "하늘을 덮는 정도 0~1"
+    },
+    "rim": {
+      "slot": "P2.rgb",
+      "default": "#FFE6B8",
+      "description": "얇은 가장자리 빛 색"
+    },
+    "rimStrength": {
+      "slot": "P2.a",
+      "default": 0.3,
+      "description": "가장자리 빛 세기 0~1"
+    },
+    "scale": {
+      "slot": "P3.x",
+      "default": 500,
+      "description": "구름 크기 px(1080p 기준)"
+    },
+    "speed": {
+      "slot": "P3.y",
+      "default": 0.01,
+      "description": "흐름 속도(구름 크기 단위/초, -는 왼쪽으로)"
+    },
+    "top": {
+      "slot": "P3.z",
+      "default": 0,
+      "description": "구름 띠 위 끝(0=위)"
+    },
+    "bottom": {
+      "slot": "P3.w",
+      "default": 0.6,
+      "description": "구름 띠 아래 끝(0=위). 원근은 이쪽을 먼 하늘로 본다"
+    },
+    "offsetX": {
+      "slot": "P4.x",
+      "default": 0,
+      "description": "무늬 가로 시작 위치 px(1080p 기준). 이웃 화면과 이을 때 쓴다"
+    },
+    "flip": {
+      "slot": "P4.y",
+      "default": 0,
+      "description": "1이면 위아래 뒤집기(수면 반사용)"
+    },
+    "softness": {
+      "slot": "P4.z",
+      "default": 0.12,
+      "description": "가장자리 부드러움(클수록 흐릿)"
+    },
+    "perspective": {
+      "slot": "P4.w",
+      "default": 0.6,
+      "description": "원근 0~1(띠 아래쪽 구름이 납작해지는 정도)"
+    },
+    "lightX": {
+      "slot": "P5.x",
+      "default": 0.3,
+      "description": "빛 방향 가로(+는 오른쪽에서 비침)"
+    },
+    "lightY": {
+      "slot": "P5.y",
+      "default": 1,
+      "description": "빛 방향 세로(+는 위에서, -는 아래에서 비침)"
+    },
+    "shading": {
+      "slot": "P5.z",
+      "default": 0.6,
+      "description": "두꺼운 곳 그늘 세기 0~1"
+    },
+    "fade": {
+      "slot": "P5.w",
+      "default": 0.15,
+      "description": "띠 아래 끝에서 구름이 옅어지는 구간(띠 높이 비율)"
+    },
+    "stretch": {
+      "slot": "P6.x",
+      "default": 1.25,
+      "description": "가로로 늘인 정도(1=둥글게, 클수록 가로로 긴 구름)"
+    }
+  }
+}

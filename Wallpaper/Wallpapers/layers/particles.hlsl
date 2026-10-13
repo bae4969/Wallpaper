@@ -7,9 +7,9 @@ V VS(uint vid : SV_VertexID, uint instance : SV_InstanceID)
     float unit = Unit();
     float speed = lerp(1 - P[4].z, 1 + P[4].z, h3);
     float2 velocity = P[4].xy * speed;
-    float2 p = frac(float2(h1, h2) + velocity * Time);
+    float2 p = frac(float2(h1, h2) + velocity * Time * float2(SpanScale(), 1));
     float areaHeight = P[5].y - P[5].x;
-    float2 center = float2(p.x, P[5].x + p.y * areaHeight) * Resolution;
+    float2 center = float2(Span.x + p.x * Span.y, (P[5].x + p.y * areaHeight) * Resolution.y);   // 가로는 옆 모니터까지
     float size = lerp(P[3].x, P[3].y, h4) * unit;
     float2 corner = Corners[vid];
     float2 offset;

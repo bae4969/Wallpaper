@@ -1,0 +1,67 @@
+{
+  "description": "흔들리는 오로라 커튼 두 겹(더하기 혼합). offsetX·flip 으로 다른 화면(수면 반사)과 무늬를 이어 붙인다.",
+  "kind": "fullscreen",
+  "blend": "add",
+  "params": {
+    "colorA": {
+      "slot": "P0.rgb",
+      "default": "#3DFFB0",
+      "description": "아래 가장자리 색"
+    },
+    "intensity": {
+      "slot": "P0.a",
+      "default": 0.7,
+      "description": "밝기"
+    },
+    "colorB": {
+      "slot": "P1.rgb",
+      "default": "#9B6BFF",
+      "description": "위로 갈수록 섞이는 색"
+    },
+    "colorBMix": {
+      "slot": "P1.a",
+      "default": 0.8,
+      "description": "색 B 섞임 0~1"
+    },
+    "height": {
+      "slot": "P2.x",
+      "default": 0.4,
+      "description": "커튼 아래 가장자리 높이(0=위, 1=아래)"
+    },
+    "thickness": {
+      "slot": "P2.y",
+      "default": 0.2,
+      "description": "커튼이 위로 퍼지는 길이(화면 높이 비율)"
+    },
+    "waviness": {
+      "slot": "P2.z",
+      "default": 0.06,
+      "description": "가장자리 출렁임 폭(화면 높이 비율)"
+    },
+    "scale": {
+      "slot": "P2.w",
+      "default": 700,
+      "description": "커튼 굽이 폭 px(1080p 기준)"
+    },
+    "speed": {
+      "slot": "P3.x",
+      "default": 0.05,
+      "description": "움직임 속도"
+    },
+    "offsetX": {
+      "slot": "P3.y",
+      "default": 0,
+      "description": "무늬 가로 시작 위치 px(1080p 기준). 이웃 화면과 이을 때 쓴다"
+    },
+    "flip": {
+      "slot": "P3.z",
+      "default": 0,
+      "description": "1이면 위아래 뒤집기(수면 반사용)"
+    },
+    "rays": {
+      "slot": "P3.w",
+      "default": 0.7,
+      "description": "세로 빛줄기 세기 0~1"
+    }
+  }
+}

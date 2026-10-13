@@ -1,0 +1,62 @@
+{
+  "description": "잔물결 수면. 수평선 아래 부분을 물결로 일렁이게 하고 어둡게·색조를 입혀 다시 그린다. mirror 서브에서는 엔진이 메인 풍경을 뒤집어 주므로 이 레이어만 덧붙이면 수면 반사가 된다.",
+  "kind": "post",
+  "blend": "opaque",
+  "params": {
+    "tint": {
+      "slot": "P0.rgb",
+      "default": "#B0C8E0",
+      "description": "물 색조"
+    },
+    "reflectivity": {
+      "slot": "P0.a",
+      "default": 0.75,
+      "description": "반사 밝기 0~1"
+    },
+    "ripple": {
+      "slot": "P1.x",
+      "default": 10,
+      "description": "물결 일렁임 폭 px(1080p 기준)"
+    },
+    "wavelength": {
+      "slot": "P1.y",
+      "default": 24,
+      "description": "물결 크기 px(1080p 기준)"
+    },
+    "speed": {
+      "slot": "P1.z",
+      "default": 0.6,
+      "description": "물결 속도"
+    },
+    "blur": {
+      "slot": "P1.w",
+      "default": 1.2,
+      "description": "반사 흐림(mip 단계)"
+    },
+    "sparkle": {
+      "slot": "P2.x",
+      "default": 0.4,
+      "description": "물결 반짝임 세기 0~1"
+    },
+    "horizon": {
+      "slot": "P2.y",
+      "default": 0,
+      "description": "수면 시작 높이(0=위). 그 위는 그대로 둔다"
+    },
+    "fade": {
+      "slot": "P2.z",
+      "default": 0.4,
+      "description": "앞쪽(아래)으로 갈수록 어두워지는 정도 0~1"
+    },
+    "rain": {
+      "slot": "P2.w",
+      "default": 0,
+      "description": "빗방울 파문 세기 0~1(0이면 끔). 빗물 고인 길·비 오는 수면"
+    },
+    "rainSize": {
+      "slot": "P3.x",
+      "default": 60,
+      "description": "빗방울 파문 칸 크기 px(1080p 기준, 앞쪽 기준. 뒤로 갈수록 작아진다)"
+    }
+  }
+}

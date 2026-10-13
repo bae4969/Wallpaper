@@ -1,0 +1,72 @@
+{
+  "description": "해·달 원반과 부드러운 후광, 은은한 빛살. 지평선 아래로 내려간 부분은 잘린다.",
+  "kind": "fullscreen",
+  "blend": "alpha",
+  "params": {
+    "color": {
+      "slot": "P0.rgb",
+      "default": "#FFF4D6",
+      "description": "원반 색"
+    },
+    "discOpacity": {
+      "slot": "P0.a",
+      "default": 1,
+      "description": "원반 불투명도 0~1"
+    },
+    "haloColor": {
+      "slot": "P1.rgb",
+      "default": "#FFB45C",
+      "description": "후광 색"
+    },
+    "glow": {
+      "slot": "P1.a",
+      "default": 0.6,
+      "description": "후광 세기"
+    },
+    "x": {
+      "slot": "P2.x",
+      "default": 0.7,
+      "description": "가로 위치(0=왼쪽, 1=오른쪽)"
+    },
+    "y": {
+      "slot": "P2.y",
+      "default": 0.5,
+      "description": "세로 위치(0=위, 1=아래)"
+    },
+    "size": {
+      "slot": "P2.z",
+      "default": 40,
+      "description": "원반 반지름 px(1080p 기준)"
+    },
+    "haloSize": {
+      "slot": "P2.w",
+      "default": 60,
+      "description": "후광 크기 px(1080p 기준)"
+    },
+    "rays": {
+      "slot": "P3.x",
+      "default": 0,
+      "description": "빛살 세기 0~1(0이면 없음)"
+    },
+    "raySpeed": {
+      "slot": "P3.y",
+      "default": 0.05,
+      "description": "빛살이 도는 속도"
+    },
+    "horizon": {
+      "slot": "P3.z",
+      "default": 2,
+      "description": "지평선 높이(0=위). 그 아래 원반은 잘린다. 1보다 크면 자르지 않음"
+    },
+    "wideGlow": {
+      "slot": "P3.w",
+      "default": 0.3,
+      "description": "넓게 퍼지는 빛 세기"
+    },
+    "wideColor": {
+      "slot": "P4.rgb",
+      "default": "#FF8A4C",
+      "description": "넓게 퍼지는 빛 색"
+    }
+  }
+}

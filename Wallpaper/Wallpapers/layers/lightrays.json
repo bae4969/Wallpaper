@@ -1,0 +1,77 @@
+{
+  "description": "한 점(화면 위 바깥도 가능)에서 부채꼴로 퍼지는 빛줄기(god rays). 천천히 일렁이며 더하기 혼합으로 밝힌다.",
+  "kind": "fullscreen",
+  "blend": "add",
+  "params": {
+    "color": {
+      "slot": "P0.rgb",
+      "default": "#FFE6B0",
+      "description": "빛 색"
+    },
+    "intensity": {
+      "slot": "P0.a",
+      "default": 0.35,
+      "description": "밝기"
+    },
+    "originX": {
+      "slot": "P1.x",
+      "default": 0.3,
+      "description": "빛이 나오는 점 가로 위치(화면 폭 비율, 0=왼쪽)"
+    },
+    "originY": {
+      "slot": "P1.y",
+      "default": -0.2,
+      "description": "빛이 나오는 점 세로 위치(화면 높이 비율, 0=위, 음수면 화면 위 바깥)"
+    },
+    "direction": {
+      "slot": "P1.z",
+      "default": 15,
+      "description": "빛줄기 묶음의 가운데 방향(도, 0=아래, +는 오른쪽으로 기울어짐)"
+    },
+    "spread": {
+      "slot": "P1.w",
+      "default": 30,
+      "description": "부채꼴 반폭(도)"
+    },
+    "rayCount": {
+      "slot": "P2.x",
+      "default": 40,
+      "description": "빛줄기 촘촘함(클수록 가는 줄기가 많다)"
+    },
+    "sharpness": {
+      "slot": "P2.y",
+      "default": 2.5,
+      "description": "빛줄기 선명함(클수록 줄기 사이가 어둡다)"
+    },
+    "speed": {
+      "slot": "P2.z",
+      "default": 0.05,
+      "description": "일렁임 속도"
+    },
+    "length": {
+      "slot": "P2.w",
+      "default": 1.2,
+      "description": "빛줄기가 옅어지는 길이(화면 높이 비율)"
+    },
+    "glow": {
+      "slot": "P3.x",
+      "default": 0,
+      "description": "빛이 나오는 점 주변 번짐 세기"
+    },
+    "glowSize": {
+      "slot": "P3.y",
+      "default": 300,
+      "description": "점 주변 번짐 크기 px(1080p 기준)"
+    },
+    "dust": {
+      "slot": "P3.z",
+      "default": 0.3,
+      "description": "빛줄기를 따라 흘러가는 얼룩(먼지·안개) 정도 0~1"
+    },
+    "bottomFade": {
+      "slot": "P3.w",
+      "default": 0.3,
+      "description": "화면 아래로 갈수록 옅어지는 정도 0~1"
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "description": "생성형 산 능선 실루엣. seed·scale 을 바꿔 여러 겹 쌓는다. offsetX·flip 으로 다른 화면(수면 반사)과 능선을 이어 붙인다.",
+  "kind": "fullscreen",
+  "blend": "alpha",
+  "params": {
+    "color": {
+      "slot": "P0.rgb",
+      "default": "#05070D",
+      "description": "산 색"
+    },
+    "opacity": {
+      "slot": "P0.a",
+      "default": 1,
+      "description": "불투명도"
+    },
+    "ground": {
+      "slot": "P1.x",
+      "default": 1,
+      "description": "산 바닥 높이(0=위, 1=아래)"
+    },
+    "height": {
+      "slot": "P1.y",
+      "default": 0.2,
+      "description": "가장 높은 봉우리 높이(화면 높이 비율)"
+    },
+    "roughness": {
+      "slot": "P1.z",
+      "default": 0.75,
+      "description": "봉우리 높낮이 차 0~1"
+    },
+    "scale": {
+      "slot": "P1.w",
+      "default": 900,
+      "description": "봉우리 폭 px(1080p 기준)"
+    },
+    "offsetX": {
+      "slot": "P2.x",
+      "default": 0,
+      "description": "능선 가로 시작 위치 px(1080p 기준). 이웃 화면과 이을 때 쓴다"
+    },
+    "flip": {
+      "slot": "P2.y",
+      "default": 0,
+      "description": "1이면 위아래 뒤집기(수면 반사용)"
+    },
+    "shade": {
+      "slot": "P2.z",
+      "default": 0,
+      "description": "능선에서 아래로 갈수록 어둡게 하는 정도 0~1(0이면 한 색). 눈 둔덕·가까운 언덕에 음영을 준다"
+    },
+    "shadeDepth": {
+      "slot": "P2.w",
+      "default": 200,
+      "description": "어둡게 하는 거리 px(1080p 기준, 능선에서 아래로)"
+    },
+    "rim": {
+      "slot": "P3.rgb",
+      "default": "#000000",
+      "description": "능선 테두리 빛 색"
+    },
+    "rimStrength": {
+      "slot": "P3.a",
+      "default": 0,
+      "description": "능선 테두리 빛 세기 0~1"
+    }
+  }
+}

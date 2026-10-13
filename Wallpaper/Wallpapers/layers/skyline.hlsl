@@ -1,9 +1,11 @@
 // skyline: P0 건물 색(a=불투명도), P1/P2 창문 색(a=밝기), P3 (지면 y, 최소 높이, 최대 높이, 건물 폭 px)
 //          P4 (창문 켜짐 비율, 깜박임 속도, -, 안개 섞임), P5 안개 색, P6 (창문 칸 폭, 높이, 가로 여백, 세로 여백)
+//          P7 (가로 시작 px, 뒤집기)
 float4 PS(V i) : SV_Target
 {
     float unit = Unit();
-    float2 px = i.uv * Resolution;
+    float y = P[7].y > 0.5 ? 1 - i.uv.y : i.uv.y;
+    float2 px = float2(CanvasPixel(i).x + P[7].x * unit, y * Resolution.y);
     float width = P[3].w * unit;
     float shift = Seed * 37.0;
     float slot = px.x / width + shift;
@@ -13,9 +15,9 @@ float4 PS(V i) : SV_Target
     float top = P[3].x - lerp(P[3].y, P[3].z, hk * hk);
     bool stepped = Hash11(k * 3.1 + Seed) > 0.55;
     if (stepped && (localX < 0.22 || localX > 0.78)) top += 0.035;
-    bool antenna = Hash11(k * 5.3 + Seed) > 0.8 && abs(localX - 0.5) < 0.015 && i.uv.y > top - 0.07 && i.uv.y < top;
+    bool antenna = Hash11(k * 5.3 + Seed) > 0.8 && abs(localX - 0.5) < 0.015 && y > top - 0.07 && y < top;
     bool gap = localX < 0.05 || localX > 0.97;
-    bool inside = (i.uv.y >= top && i.uv.y <= P[3].x && !gap) || antenna;
+    bool inside = (y >= top && y <= P[3].x && !gap) || antenna;
     if (!inside) return 0;
 
     float3 color = P[0].rgb;

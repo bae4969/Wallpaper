@@ -1,0 +1,107 @@
+{
+  "description": "수평선 아래 원근 바다. 출렁이는 물결, 해가 비친 반짝이는 빛 길, 하늘 반사, 수평선 안개, 흰 물거품(선택).",
+  "kind": "fullscreen",
+  "blend": "alpha",
+  "params": {
+    "deep": {
+      "slot": "P0.rgb",
+      "default": "#0B2238",
+      "description": "깊은 물 색"
+    },
+    "opacity": {
+      "slot": "P0.a",
+      "default": 1,
+      "description": "불투명도"
+    },
+    "shallow": {
+      "slot": "P1.rgb",
+      "default": "#2E6E7E",
+      "description": "물마루(밝은 물) 색"
+    },
+    "shallowMix": {
+      "slot": "P1.a",
+      "default": 0.5,
+      "description": "물마루 색 섞임 0~1"
+    },
+    "sky": {
+      "slot": "P2.rgb",
+      "default": "#6A88B0",
+      "description": "물에 비친 하늘 색(위쪽 하늘)"
+    },
+    "reflection": {
+      "slot": "P2.a",
+      "default": 0.8,
+      "description": "하늘 반사 세기 0~1"
+    },
+    "sunColor": {
+      "slot": "P3.rgb",
+      "default": "#FFC27A",
+      "description": "물에 비친 햇빛 색"
+    },
+    "sunStrength": {
+      "slot": "P3.a",
+      "default": 1,
+      "description": "햇빛 반사 세기"
+    },
+    "horizon": {
+      "slot": "P4.x",
+      "default": 0.6,
+      "description": "수평선 높이(0=위, 1=아래)"
+    },
+    "sunX": {
+      "slot": "P4.y",
+      "default": 0.5,
+      "description": "해 가로 위치(0=왼쪽, 1=오른쪽). 빛 길이 이 아래로 생긴다"
+    },
+    "sunY": {
+      "slot": "P4.z",
+      "default": 0.5,
+      "description": "해 세로 위치(0=위). 수평선에 가까울수록 빛 길이 가늘고 길어진다"
+    },
+    "waveScale": {
+      "slot": "P4.w",
+      "default": 1,
+      "description": "물결 크기(클수록 큰 물결)"
+    },
+    "speed": {
+      "slot": "P5.x",
+      "default": 0.5,
+      "description": "물결 속도"
+    },
+    "choppiness": {
+      "slot": "P5.y",
+      "default": 0.5,
+      "description": "물결 높이(가파름) 0~1"
+    },
+    "foam": {
+      "slot": "P5.z",
+      "default": 0,
+      "description": "흰 물거품 세기 0~1(0이면 없음)"
+    },
+    "glitter": {
+      "slot": "P5.w",
+      "default": 0.6,
+      "description": "빛 길 반짝임 세기 0~1"
+    },
+    "haze": {
+      "slot": "P6.rgb",
+      "default": "#C8A090",
+      "description": "수평선 안개 색(하늘 그라데이션의 수평선 색과 맞추면 자연스럽다)"
+    },
+    "hazeWidth": {
+      "slot": "P6.a",
+      "default": 0.03,
+      "description": "수평선 안개 폭(화면 높이 비율)"
+    },
+    "windAngle": {
+      "slot": "P7.x",
+      "default": 15,
+      "description": "물결이 오는 방향(도, 0=정면에서)"
+    },
+    "near": {
+      "slot": "P7.y",
+      "default": 0,
+      "description": "가까운 바다 잔물결·반짝임 디테일 0~1(0이면 예전 그대로). 화면 아래·서브 continue 처럼 가까운 물을 그릴 때"
+    }
+  }
+}

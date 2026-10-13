@@ -24,7 +24,7 @@ float4 SlidingDrops(float2 px, float size, float t)
     float col = floor(px.x / column);
     float h = Hash11(col + Seed * 13);
     float speed = (0.35 + h) * P[2].y * size;
-    float period = Resolution.y + size * 30;
+    float period = Screen.y + size * 30;
     float travel = speed * (t + 0.6 * sin(t * 0.9 + h * 20) / 0.9) + h * period;
     float y = fmod(travel, period) - size * 15;
     float x = (col + 0.5 + (Hash11(col * 1.7) - 0.5) * 0.5) * column + sin(y / (size * 4) + h * 6) * size * 0.3;
@@ -48,7 +48,7 @@ float4 SlidingDrops(float2 px, float size, float t)
 float4 PS(V i) : SV_Target
 {
     float unit = Unit();
-    float2 px = i.uv * Resolution;
+    float2 px = ScreenUV(i) * Screen;
     float size = P[2].x * unit;
     float4 small = StaticDrops(px, size, Time, Seed);
     float4 tiny = StaticDrops(px + 37.3 * size, size * 0.55, Time * 1.3, Seed + 9);
@@ -59,9 +59,9 @@ float4 PS(V i) : SV_Target
     float2 normal = slide.z >= still ? slide.xy : (small.z >= tiny.z ? small.xy : tiny.xy);
     float clear = max(slide.w, mask);
 
-    float2 offset = -normal * P[0].y * mask * size / Resolution;
+    float2 offset = -normal * P[0].y * mask * size / Screen;
     float level = lerp(P[0].z, 0.5, clear);
-    float3 color = Source.SampleLevel(Linear, i.uv + offset, level).rgb;
+    float3 color = Source.SampleLevel(Linear, ScreenUV(i) + offset, level).rgb;
     color = lerp(color, color * P[1].rgb, (1 - clear) * P[0].w);
     color *= 1 - mask * smoothstep(0.65, 1.0, length(normal)) * 0.35;
     float3 n = normalize(float3(normal, 0.65));

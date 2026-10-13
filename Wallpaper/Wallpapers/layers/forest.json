@@ -1,0 +1,117 @@
+{
+  "description": "생성형 침엽수(전나무·소나무) 숲 실루엣. 지면 선을 따라 높이가 제각각인 나무가 늘어서고, 아래쪽 안개 색 섞기로 원근감을 낸다. seed·높이·폭을 바꿔 여러 겹 쌓는다.",
+  "kind": "fullscreen",
+  "blend": "alpha",
+  "params": {
+    "color": {
+      "slot": "P0.rgb",
+      "default": "#0B1410",
+      "description": "나무 색"
+    },
+    "opacity": {
+      "slot": "P0.a",
+      "default": 1,
+      "description": "불투명도"
+    },
+    "ground": {
+      "slot": "P1.x",
+      "default": 1,
+      "description": "지면(나무 밑동) 높이(0=위, 1=아래). 그 아래는 나무 색으로 채운다"
+    },
+    "minHeight": {
+      "slot": "P1.y",
+      "default": 0.12,
+      "description": "가장 작은 나무 높이(화면 높이 비율)"
+    },
+    "maxHeight": {
+      "slot": "P1.z",
+      "default": 0.35,
+      "description": "가장 큰 나무 높이(화면 높이 비율)"
+    },
+    "treeSpacing": {
+      "slot": "P1.w",
+      "default": 60,
+      "description": "나무 간격 px(1080p 기준)"
+    },
+    "density": {
+      "slot": "P2.x",
+      "default": 0.85,
+      "description": "나무가 서 있을 확률 0~1(작을수록 듬성듬성)"
+    },
+    "haze": {
+      "slot": "P2.y",
+      "default": 0,
+      "description": "전체를 안개 색과 섞는 정도 0~1(멀수록 크게)"
+    },
+    "baseFog": {
+      "slot": "P2.z",
+      "default": 0,
+      "description": "밑동 쪽에 더 섞이는 안개 정도 0~1(땅안개)"
+    },
+    "fogHeight": {
+      "slot": "P2.w",
+      "default": 0.15,
+      "description": "땅안개가 위로 퍼지는 높이(화면 높이 비율)"
+    },
+    "hazeColor": {
+      "slot": "P3.rgb",
+      "default": "#8FA39A",
+      "description": "안개 색"
+    },
+    "slenderness": {
+      "slot": "P3.a",
+      "default": 1,
+      "description": "나무 폭 배율(작을수록 가늘고 뾰족하다)"
+    },
+    "offsetX": {
+      "slot": "P4.x",
+      "default": 0,
+      "description": "배치 가로 시작 위치 px(1080p 기준). 이웃 화면과 이을 때 쓴다"
+    },
+    "flip": {
+      "slot": "P4.y",
+      "default": 0,
+      "description": "1이면 위아래 뒤집기(수면 반사용)"
+    },
+    "hills": {
+      "slot": "P4.z",
+      "default": 0.03,
+      "description": "지면이 완만하게 오르내리는 폭(화면 높이 비율)"
+    },
+    "sway": {
+      "slot": "P4.w",
+      "default": 0,
+      "description": "바람에 나무 끝이 흔들리는 폭 px"
+    },
+    "rim": {
+      "slot": "P5.rgb",
+      "default": "#000000",
+      "description": "가장자리 빛(역광) 색"
+    },
+    "rimStrength": {
+      "slot": "P5.a",
+      "default": 0,
+      "description": "가장자리 빛 세기 0~1"
+    },
+    "tiers": {
+      "slot": "P6.x",
+      "default": 14,
+      "description": "가지 층 수(큰 나무 기준)"
+    },
+    "jagged": {
+      "slot": "P6.y",
+      "default": 0.5,
+      "description": "가지 끝 들쭉날쭉한 정도 0~1"
+    },
+    "baseFade": {
+      "slot": "P6.z",
+      "default": 0,
+      "description": "땅안개 높이 안에서 밑동을 투명하게 녹이는 정도 0~1(지면 경계를 지운다)"
+    },
+    "clearCenter": {
+      "slot": "P6.w",
+      "default": 0,
+      "description": "화면 가운데에서 좌우로 이 거리 px(1080p 기준) 안에는 나무를 세우지 않는다. 0이면 끔(가까운 나무를 양옆 가장자리에만 둘 때)"
+    }
+  }
+}

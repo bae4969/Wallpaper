@@ -1,0 +1,82 @@
+{
+  "description": "천천히 흐르는 색색의 성운 구름(도메인 워핑 잡음)과 어두운 먼지 띠. 먼지 띠는 아래에 그린 별을 가린다.",
+  "kind": "fullscreen",
+  "blend": "alpha",
+  "params": {
+    "colorA": {
+      "slot": "P0.rgb",
+      "default": "#3A6BFF",
+      "description": "성운 색 A(기본 바탕)"
+    },
+    "brightness": {
+      "slot": "P0.a",
+      "default": 0.8,
+      "description": "밝기"
+    },
+    "colorB": {
+      "slot": "P1.rgb",
+      "default": "#FF3D9A",
+      "description": "성운 색 B(소용돌이 쪽)"
+    },
+    "density": {
+      "slot": "P1.a",
+      "default": 0.5,
+      "description": "구름 양 0~1(클수록 하늘을 많이 덮는다)"
+    },
+    "colorC": {
+      "slot": "P2.rgb",
+      "default": "#FFB070",
+      "description": "성운 색 C(밝은 가장자리 쪽)"
+    },
+    "dust": {
+      "slot": "P2.a",
+      "default": 0.7,
+      "description": "어두운 먼지 띠 세기 0~1"
+    },
+    "scale": {
+      "slot": "P3.x",
+      "default": 700,
+      "description": "구름 무늬 크기 px(1080p 기준)"
+    },
+    "speed": {
+      "slot": "P3.y",
+      "default": 0.01,
+      "description": "흐름 속도(작을수록 느리게 오가며 모양이 바뀐다)"
+    },
+    "offsetX": {
+      "slot": "P3.z",
+      "default": 0,
+      "description": "무늬 가로 위치 px(1080p 기준). 마음에 드는 모양을 고를 때 쓴다"
+    },
+    "offsetY": {
+      "slot": "P3.w",
+      "default": 0,
+      "description": "무늬 세로 위치 px(1080p 기준)"
+    },
+    "centerFade": {
+      "slot": "P4.x",
+      "default": 0.4,
+      "description": "화면 가운데를 옅게 하는 정도 0~1(시계 위젯 자리)"
+    },
+    "warp": {
+      "slot": "P4.y",
+      "default": 2.2,
+      "description": "소용돌이 비틀림 세기"
+    },
+    "patchiness": {
+      "slot": "P4.z",
+      "default": 0.6,
+      "description": "구름이 덩어리로 끊기는 정도 0~1"
+    },
+    "fillBelow": {
+      "slot": "P4.w",
+      "default": 0,
+      "description": "메인 아래(continue 서브)를 구름으로 더 채우는 정도 0~1. 메인 화면은 그대로"
+    },
+    "belowBrightness": {
+      "slot": "P5.x",
+      "default": 1,
+      "description": "메인 아래(continue 서브)의 밝기 배율. 경계에서부터 서서히 바뀐다. 메인 화면은 그대로"
+    }
+  }
+}

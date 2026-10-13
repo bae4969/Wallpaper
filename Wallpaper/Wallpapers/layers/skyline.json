@@ -92,6 +92,16 @@
       "slot": "P6.w",
       "default": 0.3,
       "description": "창문 칸 세로 여백 비율"
+    },
+    "offsetX": {
+      "slot": "P7.x",
+      "default": 0,
+      "description": "배치 가로 시작 위치 px(1080p 기준). 이웃 화면과 이을 때 쓴다"
+    },
+    "flip": {
+      "slot": "P7.y",
+      "default": 0,
+      "description": "1이면 위아래 뒤집기(수면 반사용)"
     }
   }
 }

@@ -1,0 +1,21 @@
+{
+  "description": "천천히 변하는 지형의 등고선 지도. 가는 선은 안티에일리어싱되고 N번째 선마다 굵게 그린다. 높이에 따라 선 색을 바꿀 수 있다. 보통 맨 아래 레이어.",
+  "kind": "fullscreen",
+  "blend": "opaque",
+  "params": {
+    "background": { "slot": "P0.rgb", "default": "#14181F", "description": "바탕 색" },
+    "fill": { "slot": "P0.a", "default": 0.3, "description": "높이에 따라 바탕을 밝게/어둡게 하는 정도 0~1" },
+    "lineColor": { "slot": "P1.rgb", "default": "#5AA9C8", "description": "낮은 곳 선 색" },
+    "opacity": { "slot": "P1.a", "default": 0.6, "description": "선 불투명도 0~1" },
+    "lineColorHigh": { "slot": "P2.rgb", "default": "#E0A060", "description": "높은 곳 선 색" },
+    "tint": { "slot": "P2.a", "default": 1.0, "description": "높이별 선 색 섞임 0~1(0이면 낮은 곳 색만)" },
+    "lines": { "slot": "P3.x", "default": 24, "description": "높이 전체에 그리는 선 개수(클수록 촘촘)" },
+    "thickness": { "slot": "P3.y", "default": 1.2, "description": "가는 선 두께 px(1080p 기준)" },
+    "majorEvery": { "slot": "P3.z", "default": 5, "description": "굵은 선 간격(N번째 선마다)" },
+    "majorWidth": { "slot": "P3.w", "default": 2.2, "description": "굵은 선 두께 배율" },
+    "scale": { "slot": "P4.x", "default": 600, "description": "지형 무늬 크기 px(1080p 기준)" },
+    "speed": { "slot": "P4.y", "default": 0.03, "description": "지형 변화 속도" },
+    "majorBoost": { "slot": "P4.z", "default": 1.0, "description": "굵은 선 밝기 배율" },
+    "edgeFade": { "slot": "P4.w", "default": 0.3, "description": "가장자리로 갈수록 선이 옅어지는 정도 0~1" }
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "description": "블랙홀. 검은 사건의 지평선, 얇은 광자 고리, 거의 옆에서 본 회전 강착원반과 그 뒤쪽이 중력렌즈로 휘어 위아래로 감싸는 빛 고리. 한쪽이 더 밝다(도플러). 지평선 안쪽은 아래 레이어를 가린다.",
+  "kind": "fullscreen",
+  "blend": "alpha",
+  "params": {
+    "hotColor": {
+      "slot": "P0.rgb",
+      "default": "#FFF1DA",
+      "description": "안쪽(뜨거운 곳)·광자 고리 색"
+    },
+    "brightness": {
+      "slot": "P0.a",
+      "default": 1,
+      "description": "전체 밝기"
+    },
+    "diskColor": {
+      "slot": "P1.rgb",
+      "default": "#FF8A30",
+      "description": "원반 바깥쪽 색"
+    },
+    "doppler": {
+      "slot": "P1.a",
+      "default": 0.6,
+      "description": "한쪽이 더 밝은 정도 0~1(왼쪽이 다가오는 쪽)"
+    },
+    "glowColor": {
+      "slot": "P2.rgb",
+      "default": "#FF5A18",
+      "description": "주변 빛 번짐 색"
+    },
+    "glow": {
+      "slot": "P2.a",
+      "default": 0.5,
+      "description": "빛 번짐 세기 0~1"
+    },
+    "centerX": {
+      "slot": "P3.x",
+      "default": 0.5,
+      "description": "중심 가로 위치(0=왼쪽, 1=오른쪽)"
+    },
+    "centerY": {
+      "slot": "P3.y",
+      "default": 0.5,
+      "description": "중심 세로 위치(0=위, 1=아래)"
+    },
+    "size": {
+      "slot": "P3.z",
+      "default": 130,
+      "description": "검은 지평선 반지름 px(1080p 기준). 원반은 이보다 몇 배 넓다"
+    },
+    "tilt": {
+      "slot": "P3.w",
+      "default": -8,
+      "description": "원반 기울기(도, +는 시계 방향)"
+    },
+    "inclination": {
+      "slot": "P4.x",
+      "default": 0.12,
+      "description": "원반 납작함(0.05=거의 옆, 0.4=비스듬히 위에서)"
+    },
+    "diskSize": {
+      "slot": "P4.y",
+      "default": 6,
+      "description": "원반 바깥 반지름(지평선 반지름의 배수)"
+    },
+    "speed": {
+      "slot": "P4.z",
+      "default": 0.02,
+      "description": "원반 회전 속도(초당 바퀴)"
+    },
+    "lensing": {
+      "slot": "P4.w",
+      "default": 1,
+      "description": "위아래로 휘어 감싸는 빛 고리 세기 0~1.5"
+    },
+    "turbulence": {
+      "slot": "P5.x",
+      "default": 6,
+      "description": "원반 결 촘촘함(클수록 가는 줄무늬)"
+    },
+    "contrast": {
+      "slot": "P5.y",
+      "default": 0.7,
+      "description": "원반 결 대비 0~1"
+    }
+  }
+}

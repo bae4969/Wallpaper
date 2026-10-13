@@ -1,0 +1,19 @@
+{
+  "description": "천천히 휘감기며 흐르는 컬러 유체(잉크). 도메인 왜곡 잡음을 4색 팔레트로 칠하고 광택을 얹는다. 보통 맨 아래 레이어.",
+  "kind": "fullscreen",
+  "blend": "opaque",
+  "params": {
+    "colorA": { "slot": "P0.rgb", "default": "#0B1A4A", "description": "바탕 색(낮은 곳)" },
+    "scale": { "slot": "P0.a", "default": 1.0, "description": "무늬 크기(클수록 크게)" },
+    "colorB": { "slot": "P1.rgb", "default": "#B0306A", "description": "중간 색(높은 곳)" },
+    "speed": { "slot": "P1.a", "default": 0.2, "description": "흐름 속도" },
+    "colorC": { "slot": "P2.rgb", "default": "#1E8C8C", "description": "휘감기는 결 색" },
+    "warp": { "slot": "P2.a", "default": 4.0, "description": "휘감김 세기(2~6)" },
+    "colorD": { "slot": "P3.rgb", "default": "#FF9A3C", "description": "하이라이트 색" },
+    "gloss": { "slot": "P3.a", "default": 0.25, "description": "광택 세기 0~1" },
+    "brightness": { "slot": "P4.x", "default": 1.0, "description": "전체 밝기" },
+    "contrast": { "slot": "P4.y", "default": 1.0, "description": "바탕/중간 색 경계 치우침(1=보통, 클수록 바탕 색이 넓다)" },
+    "sharpness": { "slot": "P4.z", "default": 40, "description": "광택 날카로움(클수록 작고 선명)" },
+    "streaks": { "slot": "P4.w", "default": 0.3, "description": "가는 결 무늬 세기 0~1" }
+  }
+}

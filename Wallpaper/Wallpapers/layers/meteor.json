@@ -1,0 +1,57 @@
+{
+  "description": "드물게 떨어지는 별똥별(더하기 혼합). 평균 간격마다 한 번 기회가 오고, 그중 일부만 떨어진다.",
+  "kind": "fullscreen",
+  "blend": "add",
+  "params": {
+    "color": {
+      "slot": "P0.rgb",
+      "default": "#E8F4FF",
+      "description": "색"
+    },
+    "brightness": {
+      "slot": "P0.a",
+      "default": 0.9,
+      "description": "밝기"
+    },
+    "interval": {
+      "slot": "P1.x",
+      "default": 20,
+      "description": "기회가 오는 간격 초(약 60%만 실제로 떨어진다)"
+    },
+    "length": {
+      "slot": "P1.y",
+      "default": 260,
+      "description": "꼬리 길이 px(1080p 기준)"
+    },
+    "duration": {
+      "slot": "P1.z",
+      "default": 0.9,
+      "description": "떨어지는 시간 초"
+    },
+    "width": {
+      "slot": "P1.w",
+      "default": 1.6,
+      "description": "굵기 px(1080p 기준)"
+    },
+    "top": {
+      "slot": "P2.x",
+      "default": 0.05,
+      "description": "시작 위치 위 경계(0=위)"
+    },
+    "bottom": {
+      "slot": "P2.y",
+      "default": 0.35,
+      "description": "시작 위치 아래 경계"
+    },
+    "angle": {
+      "slot": "P2.z",
+      "default": 35,
+      "description": "떨어지는 각도(도, 0=수평, 90=수직). 좌우 방향은 매번 다르다"
+    },
+    "travel": {
+      "slot": "P2.w",
+      "default": 700,
+      "description": "이동 거리 px(1080p 기준)"
+    }
+  }
+}
