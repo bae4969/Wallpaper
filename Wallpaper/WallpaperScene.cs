@@ -253,10 +253,12 @@ namespace Wallpaper
         }
 
         // Explorer가 바탕화면 창 순서를 바꾸면 아이콘 바로 뒤, Explorer 배경 층보다 앞으로 되돌린다.
+        // 화면마다 배경 창이 하나씩이라 "아이콘 바로 뒤" 자리는 하나뿐이다. 아이콘 뒤로 이 앱의 창만 이어지고 그 안에 자기 창이 있으면
+        // 그대로 둔다(예전에는 화면끼리 2초마다 서로 순서를 뺏어 z-순서가 계속 바뀌었고, 그때 서브가 가끔 하얗게 번쩍였다).
         public void KeepUnderIcons()
         {
             var icons = Native.FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null);
-            if (icons != IntPtr.Zero && Native.GetWindow(icons, 2) != Outer)
+            if (icons != IntPtr.Zero && !BehindIcons(icons))
                 Native.SetWindowPos(Outer, icons, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
             bool passed = false;
             for (var child = Native.GetWindow(progman, 5); child != IntPtr.Zero; child = Native.GetWindow(child, 2))
@@ -268,6 +270,19 @@ namespace Wallpaper
                     break;
                 }
             }
+        }
+
+        private bool BehindIcons(IntPtr icons)
+        {
+            uint self = (uint)Process.GetCurrentProcess().Id;
+            for (var window = Native.GetWindow(icons, 2); window != IntPtr.Zero; window = Native.GetWindow(window, 2))
+            {
+                if (window == Outer) return true;
+                uint process;
+                Native.GetWindowThreadProcessId(window, out process);
+                if (process != self) return false;
+            }
+            return false;
         }
 
         // 위젯 프레임: 화면 좌표의 사각형, premultiplied BGRA 내용, 그림자 알파(바이트).
@@ -316,6 +331,7 @@ namespace Wallpaper
             catch (Exception error)
             {
                 Trace.WriteLine("WallpaperScene: " + error);
+                SceneLibrary.LogError("렌더 스레드 중단 " + bounds + ": " + error.GetType().Name + ": " + error.Message);
                 stopping = true;
             }
             finally
