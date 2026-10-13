@@ -448,8 +448,11 @@ namespace Wallpaper
 
         private void CreateDevice()
         {
-            D3D11.D3D11CreateDevice(null, DriverType.Hardware, DeviceCreationFlags.BgraSupport, new[] { FeatureLevel.Level_11_0 },
-                out device, out context).CheckError();
+            // GPU 장치를 만들 수 없으면(GPU 없는 PC·원격 데스크톱·CI 러너) WARP 소프트웨어 렌더러로 그린다.
+            if (D3D11.D3D11CreateDevice(null, DriverType.Hardware, DeviceCreationFlags.BgraSupport, new[] { FeatureLevel.Level_11_0 },
+                out device, out context).Failure)
+                D3D11.D3D11CreateDevice(null, DriverType.Warp, DeviceCreationFlags.BgraSupport, new[] { FeatureLevel.Level_11_0 },
+                    out device, out context).CheckError();
             if (surface != null)
             using (var dxgiDevice = device.QueryInterface<IDXGIDevice>())
             using (var adapter = dxgiDevice.GetAdapter())
