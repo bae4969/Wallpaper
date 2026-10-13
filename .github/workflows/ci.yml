@@ -20,6 +20,8 @@ permissions:
 
 jobs:
   build:
+    # 체크 이름 = 저장소 ruleset 의 필수 상태 체크(quality-check). 바꾸면 ruleset 도 함께 바꾼다.
+    name: quality-check
     # PR 가 머지 없이 닫히면 skip
     if: github.event.action != 'closed' || github.event.pull_request.merged == true
     runs-on: windows-latest
