@@ -12,9 +12,11 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event.action != 'closed' }}
 
-# Release·tag push 권한 필요
+# Release·tag push 권한, 그리고 머지 시점에 PR run 의 artifact 를 찾는 데(gh run list·download) actions 읽기 권한이 필요하다
+# (비공개 저장소는 명시하지 않으면 403).
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build:
@@ -96,9 +98,10 @@ jobs:
         run: |
           head_sha="${{ github.event.pull_request.head.sha }}"
           artifact_name="Wallpaper-$head_sha"
+          # 조회가 실패해도(권한·API 오류) 멈추지 않고 새로 빌드한다.
           run_id=$(gh run list --workflow ci.yml --json databaseId,headSha,conclusion --limit 100 \
-            --jq "[.[] | select(.headSha==\"$head_sha\" and .conclusion==\"success\")][0].databaseId")
-          if [ -z "$run_id" ]; then
+            --jq "[.[] | select(.headSha==\"$head_sha\" and .conclusion==\"success\")][0].databaseId") || run_id=""
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
             echo "no successful prior run for head_sha=$head_sha — fallback to fresh build"
             pwsh -File ./Wallpaper/build.ps1
           else
