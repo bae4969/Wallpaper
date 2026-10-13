@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
+
+# 동시 실행 차단: 같은 PR(또는 ref)의 진행 중 워크플로우는 새 trigger 가 들어오면 cancel.
+# 단, closed/merged 시점의 release(태그+릴리즈) 단계는 cancel 되면 안 되므로 closed 액션은 예외.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event.action != 'closed' }}
+
+# Release·tag push 권한 필요
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # PR 가 머지 없이 닫히면 skip
+    if: github.event.action != 'closed' || github.event.pull_request.merged == true
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # PR 머지 시점에는 main 의 머지 커밋을 직접 체크아웃해 그 commit 에 태그
+          ref: ${{ github.event.pull_request.merged == true && github.event.pull_request.merge_commit_sha || github.ref }}
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # PR open/synchronize/reopened 시에만 빌드·검사·artifact 업로드.
+      # closed/merged 시점에는 PR head sha 의 마지막 빌드 artifact 를 재사용해 같은 SHA 를 두 번 빌드하지 않는다.
+      - name: Build (single EXE)
+        if: github.event.action != 'closed'
+        shell: pwsh
+        run: ./Wallpaper/build.ps1
+
+      # 러너에는 GPU 가 없어 WARP(소프트웨어 렌더러)로 모든 장면·위젯 셰이더를 컴파일해 본다. 실패하면 종료 코드 1.
+      - name: Validate scenes and widgets
+        if: github.event.action != 'closed'
+        shell: bash
+        run: |
+          code=0
+          ./build/Wallpaper.exe --validate --out validate.txt || code=$?
+          cat validate.txt
+          exit $code
+
+      # 대표 장면을 메인 3440x1440 + 아래 서브 1920x1200 배치로 그려 미리보기 artifact 로 남긴다.
+      - name: Render previews
+        if: github.event.action != 'closed'
+        shell: bash
+        run: |
+          mkdir -p build/preview
+          for scene in aurora-sky sunset-ocean space-nebula summer-field; do
+            code=0
+            ./build/Wallpaper.exe --render-set "$scene" "build/preview/$scene.png" \
+              --main 3440x1440 --sub 1920x1200 --at 796,1440 --time 10 --scale 0.25 --out render.txt || code=$?
+            cat render.txt
+            if [ $code -ne 0 ]; then exit $code; fi
+          done
+
+      - name: Upload EXE artifact
+        if: github.event.action != 'closed'
+        uses: actions/upload-artifact@v4
+        with:
+          # PR head sha 로 식별 — closed 시점에 같은 이름으로 재발견 가능
+          name: Wallpaper-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/Wallpaper.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload preview artifact
+        if: github.event.action != 'closed'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wallpaper-preview-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/preview/*.png
+          if-no-files-found: error
+          retention-days: 30
+
+      # ── 아래는 PR 머지 시점에만 동작 ────────────────────────────────────────
+
+      # 머지 시점: 새로 빌드하지 않고 PR 의 마지막 성공 run 의 artifact 를 다운로드.
+      - name: Download EXE from PR build
+        if: github.event.pull_request.merged == true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          artifact_name="Wallpaper-$head_sha"
+          run_id=$(gh run list --workflow ci.yml --json databaseId,headSha,conclusion --limit 100 \
+            --jq "[.[] | select(.headSha==\"$head_sha\" and .conclusion==\"success\")][0].databaseId")
+          if [ -z "$run_id" ]; then
+            echo "no successful prior run for head_sha=$head_sha — fallback to fresh build"
+            pwsh -File ./Wallpaper/build.ps1
+          else
+            echo "downloading $artifact_name from run_id=$run_id"
+            mkdir -p build
+            gh run download "$run_id" -n "$artifact_name" -D build
+          fi
+
+      - name: Compute next tag (date + merge sha7, KST)
+        id: tag
+        if: github.event.pull_request.merged == true
+        shell: bash
+        run: |
+          today=$(TZ=Asia/Seoul date +%Y.%m.%d)
+          sha="${{ github.event.pull_request.merge_commit_sha }}"
+          short_sha="${sha:0:7}"
+          new="v${today}-${short_sha}"
+          echo "new_tag=$new" >> "$GITHUB_OUTPUT"
+          echo "Next tag: $new"
+
+      - name: Create and push tag
+        if: github.event.pull_request.merged == true
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.tag.outputs.new_tag }}" "${{ github.event.pull_request.merge_commit_sha }}"
+          git push origin "${{ steps.tag.outputs.new_tag }}"
+
+      - name: Create GitHub Release with EXE
+        if: github.event.pull_request.merged == true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.new_tag }}
+          name: ${{ steps.tag.outputs.new_tag }}
+          target_commitish: ${{ github.event.pull_request.merge_commit_sha }}
+          files: build/Wallpaper.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

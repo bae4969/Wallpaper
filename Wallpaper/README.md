@@ -119,6 +119,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Wallpaper\build.ps1
 
 달력은 일요일부터 시작하며 공휴일 정보는 포함하지 않습니다. 날짜와 시간은 PC의 현지 시간을 따릅니다.
 
+## CI·릴리즈
+
+`.github/workflows/ci.yml`(GitHub Actions, `windows-latest`):
+
+- **PR(main 대상) 열기·갱신**: `build.ps1`로 단일 exe 빌드 → `--validate`로 모든 장면·위젯 검사(러너에는 GPU가 없어 WARP 소프트웨어 렌더러 사용) → 대표 장면 4개를 메인 3440×1440 + 서브 1920×1200 배치로 그린 미리보기 → exe·미리보기 artifact 업로드
+- **PR 머지**: 같은 커밋으로 만든 exe artifact를 다시 쓰고, `vYYYY.MM.DD-커밋7자리`(한국 시간) 태그와 `Wallpaper.exe`를 첨부한 GitHub 릴리즈를 만든다
+- 같은 PR의 이전 실행은 새 실행이 오면 취소하되, 머지 시점의 릴리즈 단계는 취소하지 않는다
+
+움직이는 배경은 GPU(D3D11) 장치를 만들 수 없으면 WARP로 그린다(GPU 없는 PC·원격 데스크톱·CI).
+
 ## 검증
 
 Windows 빌드 26300, 모니터 3대 구성에서 세 디스플레이의 선택·이동을 실제 설정 UI로 검증했습니다. 실제 마우스 드래그와 모서리 크기 조절 중 바탕화면 반영, 가로·세로 중앙 스냅, 독립적인 달력 이동, 재실행 후 디스플레이·위치·크기 복원을 확인했습니다. 파일 아이콘 아래 표시, 클릭 통과, `Win+D`, 트레이 종료, 플립 애니메이션 및 달력 날짜 전환도 검증했습니다.
