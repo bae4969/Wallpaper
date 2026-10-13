@@ -32,9 +32,11 @@ namespace Wallpaper
             var assembly = typeof(SceneLibrary).Assembly;
             var recorded = ReadManifest();
             bool changed = false;
+            var shipped = new HashSet<string>();
             foreach (var name in assembly.GetManifestResourceNames().Where(n => n.StartsWith(ResourcePrefix)))
             {
                 var relative = name.Substring(ResourcePrefix.Length).Replace('\\', '/');
+                shipped.Add(relative);
                 var path = Path.Combine(Root, relative.Replace('/', Path.DirectorySeparatorChar));
                 byte[] embedded;
                 using (var source = assembly.GetManifestResourceStream(name))
@@ -56,6 +58,15 @@ namespace Wallpaper
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 File.WriteAllBytes(path, embedded);
                 recorded[relative] = embeddedHash;
+                changed = true;
+            }
+            // 더 이상 실행파일에 없는 기본 파일(예: 2세트로 합친 서브 전용 장면)은 사용자가 고치지 않았으면 지운다.
+            foreach (var relative in recorded.Keys.Where(r => !shipped.Contains(r)).ToList())
+            {
+                var path = Path.Combine(Root, relative.Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(path) && Hash(File.ReadAllBytes(path)) != recorded[relative]) continue;
+                if (File.Exists(path)) File.Delete(path);
+                recorded.Remove(relative);
                 changed = true;
             }
             if (changed) WriteManifest(recorded);
@@ -140,13 +151,18 @@ namespace Wallpaper
             Directory.CreateDirectory(ScenesFolder);
             var id = FreeId("new-scene");
             File.WriteAllText(ScenePath(id), "{\n" +
-                "  // 새 장면. 레이어 종류와 값: AUTHORING.md 또는 Wallpaper.exe --list\n" +
+                "  // 새 장면(메인·서브 2세트). 레이어 종류와 값: AUTHORING.md 또는 Wallpaper.exe --list\n" +
                 "  \"name\": \"새 장면\",\n" +
                 "  \"description\": \"\",\n" +
                 "  \"layers\": [\n" +
                 "    {\"type\": \"gradient\", \"top\": \"#0E0C1C\", \"bottom\": \"#2A2046\", \"glow\": \"#C4B5FD\", \"glowStrength\": 0.2, \"glowCenter\": 0.75, \"glowWidth\": 0.25},\n" +
                 "    {\"type\": \"vignette\", \"strength\": 0.45, \"radius\": 0.45, \"softness\": 0.7}\n" +
-                "  ]\n" +
+                "  ],\n" +
+                "  // 서브 모니터: mirror(메인을 수면처럼 비춤) | continue(메인 아래로 이어짐) | screen(같은 장면을 따로)\n" +
+                "  \"sub\": {\n" +
+                "    \"mode\": \"mirror\",\n" +
+                "    \"add\": [{\"type\": \"water\", \"reflectivity\": 0.75, \"ripple\": 8, \"wavelength\": 22}]\n" +
+                "  }\n" +
                 "}\n", new UTF8Encoding(false));
             return id;
         }
@@ -245,10 +261,19 @@ namespace Wallpaper
         public SceneDefinition Definition;   // 읽지 못했으면 null
     }
 
+    // 장면 = 메인·서브 2세트. "layers" 는 메인(또는 한 화면용) 레이어, "sub" 는 서브 모니터 구성이다.
+    //   "sub": { "mode": "mirror" | "continue" | "screen", "layers": [...](없으면 메인 레이어), "add": [...](뒤에 덧붙임) }
+    // "sub" 가 없는 예전 장면은 모든 화면에 같은 레이어를 각자 따로(screen) 그린다.
     internal sealed class SceneDefinition
     {
+        public static readonly string[] SubModes = { "mirror", "continue", "screen" };
         public string Id, Name, Description;
         public JsonElement[] Layers;
+        public JsonElement[] SubLayers;          // 없으면 null
+        public string SubMode = "screen";
+
+        public bool HasSub { get { return SubLayers != null; } }
+        public JsonElement[] LayersFor(bool sub) { return sub && SubLayers != null ? SubLayers : Layers; }
 
         public static SceneDefinition Load(string path)
         {
@@ -259,14 +284,75 @@ namespace Wallpaper
                 if (!root.TryGetProperty("layers", out layers) || layers.ValueKind != JsonValueKind.Array)
                     throw new InvalidDataException("\"layers\" 배열이 없습니다.");
                 var id = Path.GetFileNameWithoutExtension(path);
-                return new SceneDefinition
+                var scene = new SceneDefinition
                 {
                     Id = id,
                     Name = root.TryGetProperty("name", out name) && name.ValueKind == JsonValueKind.String ? name.GetString() : id,
                     Description = root.TryGetProperty("description", out description) && description.ValueKind == JsonValueKind.String ? description.GetString() : "",
                     Layers = layers.EnumerateArray().Select(layer => layer.Clone()).ToArray()
                 };
+                JsonElement sub;
+                if (root.TryGetProperty("sub", out sub))
+                {
+                    if (sub.ValueKind != JsonValueKind.Object) throw new InvalidDataException("\"sub\" 는 { \"mode\", \"layers\", \"add\" } 객체여야 합니다.");
+                    JsonElement mode, subLayers, add;
+                    scene.SubMode = sub.TryGetProperty("mode", out mode) && mode.ValueKind == JsonValueKind.String ? mode.GetString() : "continue";
+                    if (!SubModes.Contains(scene.SubMode)) throw new InvalidDataException("\"sub\".\"mode\" 는 mirror, continue, screen 중 하나입니다: " + scene.SubMode);
+                    var list = sub.TryGetProperty("layers", out subLayers) && subLayers.ValueKind == JsonValueKind.Array
+                        ? subLayers.EnumerateArray().Select(layer => layer.Clone()).ToList() : scene.Layers.ToList();
+                    if (sub.TryGetProperty("add", out add) && add.ValueKind == JsonValueKind.Array) list.AddRange(add.EnumerateArray().Select(layer => layer.Clone()));
+                    scene.SubLayers = list.ToArray();
+                }
+                return scene;
             }
+        }
+    }
+
+    // 캔버스(메인 화면)에서 한 화면이 놓인 자리(픽셀). 서브가 메인 아래로 이어지거나(continue) 메인을 수면처럼 비출(mirror) 때 쓴다.
+    internal sealed class SceneView
+    {
+        public float OriginX, OriginY, CanvasWidth, CanvasHeight;
+        public bool Mirror;
+        public float SpanLeft, SpanWidth;   // 모든 화면을 합친 가로 범위(캔버스 픽셀). 입자가 옆 모니터까지 퍼진다
+
+        public static SceneView Whole(int width, int height) { return new SceneView { CanvasWidth = width, CanvasHeight = height, SpanWidth = width }; }
+
+        // 화면 하나가 그릴 구성과 자리. role: main | left | right(메인과 높이가 겹치는 옆 모니터 — 메인 레이어를 가로로 이어 그린다)
+        // | sub(그 밖, 예: 아래 — 장면의 서브 구성). 2세트가 아닌 장면은 화면마다 따로 그린다.
+        // main·screen·all 은 같은 좌표계(데스크톱 픽셀)의 사각형이고 all 은 연결된 모든 화면이다.
+        public static SceneView Arrange(SceneDefinition scene, System.Drawing.Rectangle main, System.Drawing.Rectangle screen,
+            IList<System.Drawing.Rectangle> all, out bool sub, out string role)
+        {
+            bool beside = screen.Top < main.Bottom && screen.Bottom > main.Top && (screen.Right <= main.Left || screen.Left >= main.Right);
+            role = screen == main ? "main" : beside ? (screen.Left < main.Left ? "left" : "right") : "sub";
+            sub = role == "sub" && scene.HasSub;
+            if (!scene.HasSub || (sub && scene.SubMode == "screen")) return Whole(screen.Width, screen.Height);
+            var view = role == "main" ? Whole(main.Width, main.Height)
+                : sub ? For(scene.SubMode, main, screen)
+                : new SceneView { OriginX = screen.Left - main.Left, OriginY = screen.Top - main.Top, CanvasWidth = main.Width, CanvasHeight = main.Height };
+            int left = all.Min(r => r.Left), right = all.Max(r => r.Right);
+            view.SpanLeft = left - main.Left;
+            view.SpanWidth = right - left;
+            return view;
+        }
+
+        // main·screen 은 같은 좌표계(데스크톱 픽셀)의 사각형. mode 가 continue·mirror 가 아니면 이 화면 자체가 캔버스다.
+        public static SceneView For(string mode, System.Drawing.Rectangle main, System.Drawing.Rectangle screen)
+        {
+            if (mode != "continue" && mode != "mirror") return Whole(screen.Width, screen.Height);
+            return new SceneView
+            {
+                OriginX = screen.Left - main.Left, OriginY = screen.Top - main.Top,
+                CanvasWidth = main.Width, CanvasHeight = main.Height, Mirror = mode == "mirror", SpanWidth = main.Width
+            };
+        }
+
+        // 크기를 scale 배 한 자리(미리보기용)
+        public SceneView Scaled(double scale)
+        {
+            return new SceneView { OriginX = (float)(OriginX * scale), OriginY = (float)(OriginY * scale),
+                CanvasWidth = (float)(CanvasWidth * scale), CanvasHeight = (float)(CanvasHeight * scale), Mirror = Mirror,
+                SpanLeft = (float)(SpanLeft * scale), SpanWidth = (float)(SpanWidth * scale) };
         }
     }
 

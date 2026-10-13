@@ -15,8 +15,9 @@ namespace Wallpaper
     {
         IEnumerable<SettingsWindow.DisplayEntry> Displays();
         IList<SceneDefinition> Scenes();
-        string Background(string device);
-        void ChangeBackground(string device, string background);
+        string Scene();                           // 배경 세트(장면 id, 빈 값은 Windows 배경화면)
+        void ChangeScene(string scene);
+        void ChangeMainDisplay(string device);    // 나머지 화면은 서브
         void OpenLayoutEditor(string device);
         IEnumerable<SettingsWindow.WidgetEntry> Widgets(string device);
         IList<WidgetScript> ScriptTypes();
@@ -35,9 +36,9 @@ namespace Wallpaper
     {
         public sealed class DisplayEntry
         {
-            public string Device, Name, Background;
-            public bool Primary;
-            public int Width, Height, Widgets;
+            public string Device, Name, Background, Role;   // Role: main | left | right | sub(배경이 없으면 빈 값)
+            public bool Primary, Main;
+            public int X, Y, Width, Height, Widgets;
         }
 
         public sealed class WidgetEntry
@@ -49,15 +50,18 @@ namespace Wallpaper
         // 장면 미리보기 그림(파일 수정 시각이 같으면 다시 그리지 않는다)
         private static readonly Dictionary<string, KeyValuePair<DateTime, BitmapSource>> thumbnails = new Dictionary<string, KeyValuePair<DateTime, BitmapSource>>();
         private static readonly object renderGate = new object();
-        private const int ThumbWidth = 160, ThumbHeight = 90;
+        private const int ThumbHeight = 44;
 
         private readonly UserPreferences preferences;
         private readonly ISettingsHost host;
         private List<DisplayEntry> displays = new List<DisplayEntry>();
-        private string device;   // 디스플레이·위젯 탭이 함께 쓰는 선택
-        private readonly List<ComboBox> pickers = new List<ComboBox>();
-        private readonly TextBlock displayInfo = new TextBlock();
-        private readonly ComboBox backgroundChoice = new ComboBox { Width = 220 };
+        private string device;   // 위젯 탭에서 고른 화면(메인 또는 서브)
+        private readonly ComboBox sceneChoice = new ComboBox { Width = 220 };
+        private readonly ComboBox mainChoice = new ComboBox();
+        private readonly TextBlock mainInfo = new TextBlock();
+        private readonly StackPanel subRows = new StackPanel();
+        private Button widgetMainButton, widgetSubButton;
+        private ComboBox widgetSubChoice;
         private IList<SceneDefinition> scenes = new List<SceneDefinition>();
         private readonly StackPanel widgetRows = new StackPanel();
         private readonly StackPanel sceneRows = new StackPanel();
@@ -71,7 +75,7 @@ namespace Wallpaper
             host = settingsHost;
             ModernTheme.Apply(this);
             Title = "Wallpaper — 설정";
-            Width = 600;
+            Width = 760;
             Height = 680;
             ResizeMode = ResizeMode.NoResize;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -118,63 +122,67 @@ namespace Wallpaper
             return tab;
         }
 
-        // ---- 디스플레이 탭: 디스플레이 고르기 · 레이아웃 편집 · 배경 ----
+        // ---- 디스플레이 탭: 배경 세트 · 메인 모니터 · 서브 모니터 ----
         private FrameworkElement DisplayTab()
         {
             var panel = new StackPanel();
-            panel.Children.Add(Label("디스플레이", 0));
-            displayInfo.Style = ModernTheme.Style("Bae.Text.Subtitle");
-            displayInfo.Margin = new Thickness(2, 8, 0, 0);
-            var section = new StackPanel();
-            section.Children.Add(PickerRow("DisplaySelector", "EditDisplay"));
-            section.Children.Add(displayInfo);
-            panel.Children.Add(Card(section, new Thickness(16, 14, 14, 14)));
-
-            panel.Children.Add(Label("배경", 18));
-            AutomationProperties.SetAutomationId(backgroundChoice, "BackgroundSelector");
-            AutomationProperties.SetName(backgroundChoice, "배경");
-            backgroundChoice.SelectionChanged += delegate
+            panel.Children.Add(Label("배경 세트", 0));
+            AutomationProperties.SetAutomationId(sceneChoice, "SceneSelector");
+            AutomationProperties.SetName(sceneChoice, "배경 세트");
+            sceneChoice.SelectionChanged += delegate
             {
-                if (loading || device == null || backgroundChoice.SelectedIndex < 0) return;
-                var chosen = backgroundChoice.SelectedIndex == 0 ? "" : backgroundChoice.SelectedIndex <= scenes.Count ? scenes[backgroundChoice.SelectedIndex - 1].Id : null;
+                if (loading || sceneChoice.SelectedIndex < 0) return;
+                var chosen = sceneChoice.SelectedIndex == 0 ? "" : sceneChoice.SelectedIndex <= scenes.Count ? scenes[sceneChoice.SelectedIndex - 1].Id : null;
                 if (chosen == null) return;
-                Run(() => host.ChangeBackground(device, chosen));
+                Run(() => host.ChangeScene(chosen));
             };
-            panel.Children.Add(Card(OptionRow("배경", "움직이는 배경 장면 또는 Windows 배경화면입니다. 장면은 장면 탭에서 만들고 관리합니다.", backgroundChoice)));
-            return panel;
-        }
+            panel.Children.Add(Card(OptionRow("배경", "메인·서브 모니터에 한 세트로 함께 적용됩니다. 서브는 세트에 따라 메인 아래로 이어지거나 메인을 수면처럼 비춥니다. 장면은 장면 탭에서 관리합니다.", sceneChoice)));
 
-        // 디스플레이 고르기 + 레이아웃 편집(위치·크기·켜고 끄기). 디스플레이·위젯 탭이 같은 선택을 쓴다.
-        private Grid PickerRow(string pickerId, string editId)
-        {
-            var picker = new ComboBox();
-            AutomationProperties.SetAutomationId(picker, pickerId);
-            AutomationProperties.SetName(picker, "디스플레이");
-            picker.SelectionChanged += delegate
+            panel.Children.Add(Label("메인 모니터", 18));
+            AutomationProperties.SetAutomationId(mainChoice, "MainDisplaySelector");
+            AutomationProperties.SetName(mainChoice, "메인 모니터");
+            mainChoice.SelectionChanged += delegate
             {
-                if (loading || picker.SelectedIndex < 0 || picker.SelectedIndex >= displays.Count) return;
-                device = displays[picker.SelectedIndex].Device;
-                ShowSelected();
+                if (loading || mainChoice.SelectedIndex < 0 || mainChoice.SelectedIndex >= displays.Count) return;
+                var chosen = displays[mainChoice.SelectedIndex].Device;
+                Run(() => host.ChangeMainDisplay(chosen));
             };
-            pickers.Add(picker);
             var edit = new Button { Content = "레이아웃 편집", Margin = new Thickness(8, 0, 0, 0) };
-            AutomationProperties.SetAutomationId(edit, editId);
-            edit.Click += delegate { if (device != null) host.OpenLayoutEditor(device); };
+            AutomationProperties.SetAutomationId(edit, "EditMainDisplay");
+            edit.Click += delegate { var main = MainEntry; if (main != null) host.OpenLayoutEditor(main.Device); };
             var row = new Grid();
             row.ColumnDefinitions.Add(new ColumnDefinition());
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.Children.Add(picker);
+            row.Children.Add(mainChoice);
             Grid.SetColumn(edit, 1);
             row.Children.Add(edit);
-            return row;
+            mainInfo.Style = ModernTheme.Style("Bae.Text.Subtitle");
+            mainInfo.Margin = new Thickness(2, 8, 0, 0);
+            var section = new StackPanel();
+            section.Children.Add(row);
+            section.Children.Add(mainInfo);
+            panel.Children.Add(Card(section, new Thickness(16, 14, 14, 14)));
+
+            panel.Children.Add(Label("서브 모니터 · 메인이 아닌 화면(옆은 메인 풍경이 이어지고, 아래는 세트의 서브 구성)", 18));
+            AutomationProperties.SetAutomationId(subRows, "SubDisplayRows");
+            panel.Children.Add(Card(subRows));
+            return panel;
+        }
+
+        private DisplayEntry MainEntry { get { return displays.FirstOrDefault(d => d.Main); } }
+        private List<DisplayEntry> SubEntries { get { return displays.Where(d => !d.Main).ToList(); } }
+
+        private static string Info(DisplayEntry display)
+        {
+            return display.Width + " × " + display.Height + " · " + display.Background + " · 위젯 " + display.Widgets + "개";
         }
 
         // ---- 위젯 탭: 고른 디스플레이의 위젯 목록·추가·제거·설정 ----
         private FrameworkElement WidgetTab()
         {
             var panel = new StackPanel();
-            panel.Children.Add(Label("디스플레이", 0));
-            panel.Children.Add(Card(PickerRow("WidgetDisplaySelector", "WidgetEditLayout"), new Thickness(16, 14, 14, 14)));
+            panel.Children.Add(Label("모니터", 0));
+            panel.Children.Add(Card(RoleRow(), new Thickness(16, 14, 14, 14)));
             var header = new Grid { Margin = new Thickness(0, 18, 0, 8) };
             header.ColumnDefinitions.Add(new ColumnDefinition());
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -191,6 +199,50 @@ namespace Wallpaper
             AutomationProperties.SetAutomationId(widgetRows, "WidgetRows");
             panel.Children.Add(Card(widgetRows));
             return panel;
+        }
+
+        // 위젯 탭: [메인 모니터] [서브 모니터] (서브가 여럿이면 고르기) + 레이아웃 편집
+        private Grid RoleRow()
+        {
+            widgetMainButton = new Button { Content = "메인 모니터" };
+            AutomationProperties.SetAutomationId(widgetMainButton, "WidgetMain");
+            widgetMainButton.Click += delegate { var main = MainEntry; if (main != null) { device = main.Device; ShowSelected(); } };
+            widgetSubButton = new Button { Content = "서브 모니터", Margin = new Thickness(8, 0, 0, 0) };
+            AutomationProperties.SetAutomationId(widgetSubButton, "WidgetSub");
+            widgetSubButton.Click += delegate
+            {
+                var subs = SubEntries;
+                if (subs.Count == 0) return;
+                int index = Math.Max(0, widgetSubChoice.SelectedIndex);
+                device = subs[Math.Min(index, subs.Count - 1)].Device;
+                ShowSelected();
+            };
+            widgetSubChoice = new ComboBox { Margin = new Thickness(8, 0, 0, 0), MinWidth = 120 };
+            AutomationProperties.SetAutomationId(widgetSubChoice, "WidgetSubSelector");
+            widgetSubChoice.SelectionChanged += delegate
+            {
+                var subs = SubEntries;
+                if (loading || widgetSubChoice.SelectedIndex < 0 || widgetSubChoice.SelectedIndex >= subs.Count) return;
+                device = subs[widgetSubChoice.SelectedIndex].Device;
+                ShowSelected();
+            };
+            var edit = new Button { Content = "레이아웃 편집", Margin = new Thickness(8, 0, 0, 0) };
+            AutomationProperties.SetAutomationId(edit, "WidgetEditLayout");
+            edit.Click += delegate { if (device != null) host.OpenLayoutEditor(device); };
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.Children.Add(widgetMainButton);
+            Grid.SetColumn(widgetSubButton, 1);
+            row.Children.Add(widgetSubButton);
+            Grid.SetColumn(widgetSubChoice, 2);
+            widgetSubChoice.HorizontalAlignment = HorizontalAlignment.Left;
+            row.Children.Add(widgetSubChoice);
+            Grid.SetColumn(edit, 3);
+            row.Children.Add(edit);
+            return row;
         }
 
         private void RefreshWidgets()
@@ -280,7 +332,8 @@ namespace Wallpaper
                 var id = file.Id;
                 var users = host.SceneUsers(id);
                 string detail = file.Definition == null ? "오류: " + file.Error
-                    : file.Definition.Layers.Length + "개 레이어" + (users.Count > 0 ? " · 사용 중: " + String.Join(", ", users) : "");
+                    : SubText(file.Definition) + " · 레이어 " + file.Definition.Layers.Length + (file.Definition.HasSub ? "/" + file.Definition.SubLayers.Length : "") + "개"
+                      + (users.Count > 0 ? " · 사용 중" : "");
                 var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
                 if (file.Definition != null)
                 {
@@ -289,31 +342,71 @@ namespace Wallpaper
                 }
                 buttons.Children.Add(SmallButton("편집", "EditScene_" + id, () => OpenFile(id)));
                 buttons.Children.Add(SmallButton("삭제", "DeleteScene_" + id, () => Delete(id, file.Definition != null ? file.Definition.Name : id, users)));
-                var thumb = new Border
+                // 미리보기: 메인 | 서브(실제 모니터 비율·배치로 그린다)
+                var thumb = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+                var layout = PreviewLayout();
+                double mainScale = ThumbHeight / (double)layout.Main.Height, subScale = ThumbHeight / (double)layout.Sub.Height;
+                var mainThumb = ThumbBox((int)Math.Round(layout.Main.Width * mainScale), ThumbHeight);
+                var subThumb = ThumbBox((int)Math.Round(layout.Sub.Width * subScale), ThumbHeight);
+                subThumb.Margin = new Thickness(4, 0, 0, 0);
+                thumb.Children.Add(mainThumb);
+                thumb.Children.Add(subThumb);
+                if (file.Definition != null)
                 {
-                    Width = ThumbWidth * 0.6, Height = ThumbHeight * 0.6, CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, 12, 0),
-                    Background = ModernTheme.Brush("Bae.SurfaceAlt"), ClipToBounds = true, VerticalAlignment = VerticalAlignment.Center
-                };
-                if (file.Definition != null) LoadThumbnail(file.Definition, thumb, version);
-                var row = Row(file.Definition != null ? file.Definition.Name : id + ".json", detail, file.Definition != null, buttons);
+                    LoadThumbnail(file.Definition, mainThumb, version, false, null);
+                    LoadThumbnail(file.Definition, subThumb, version, true, SceneView.For(file.Definition.SubMode, layout.Main, layout.Sub).Scaled(subScale));
+                }
+                // 한 장면 = [미리보기 | 이름·설명] 아래 줄에 버튼(미리보기가 두 장이라 한 줄에 다 넣으면 좁다)
+                var row = Row(file.Definition != null ? file.Definition.Name : id + ".json", detail, file.Definition != null, new StackPanel());
                 row.ColumnDefinitions.Insert(0, new ColumnDefinition { Width = GridLength.Auto });
                 foreach (UIElement child in row.Children) Grid.SetColumn(child, Grid.GetColumn(child) + 1);
                 row.Children.Add(thumb);
+                row.Margin = new Thickness(0, 9, 0, 4);
                 if (file.Definition == null) ((TextBlock)((StackPanel)row.Children[0]).Children[1]).Foreground = ModernTheme.Brush("Bae.Danger");
-                sceneRows.Children.Add(row);
+                buttons.HorizontalAlignment = HorizontalAlignment.Right;
+                buttons.Margin = new Thickness(0, 0, 0, 9);
+                var item = new StackPanel();
+                item.Children.Add(row);
+                item.Children.Add(buttons);
+                sceneRows.Children.Add(item);
             }
         }
 
+        private static string SubText(SceneDefinition scene)
+        {
+            return !scene.HasSub ? "2세트 아님(화면마다 같은 장면)" : scene.SubMode == "mirror" ? "서브: 수면 반사" : scene.SubMode == "continue" ? "서브: 이어짐" : "서브: 따로";
+        }
+
+        private static Border ThumbBox(int width, int height)
+        {
+            return new Border { Width = width, Height = height, CornerRadius = new CornerRadius(3), Background = ModernTheme.Brush("Bae.SurfaceAlt"), ClipToBounds = true };
+        }
+
+        // 미리보기 배치: 지금 메인과 아래쪽 서브 모니터(없으면 2560x1440 아래 가운데 1920x1080)
+        private sealed class Preview { public System.Drawing.Rectangle Main, Sub; }
+        private Preview PreviewLayout()
+        {
+            var main = MainEntry;
+            var sub = SubEntries.FirstOrDefault(d => d.Role == "sub");
+            var mainRect = main != null ? new System.Drawing.Rectangle(main.X, main.Y, main.Width, main.Height) : new System.Drawing.Rectangle(0, 0, 2560, 1440);
+            var subRect = sub != null ? new System.Drawing.Rectangle(sub.X, sub.Y, sub.Width, sub.Height)
+                : new System.Drawing.Rectangle(mainRect.Left + (mainRect.Width - 1920) / 2, mainRect.Bottom, 1920, 1080);
+            return new Preview { Main = mainRect, Sub = subRect };
+        }
+
         // 미리보기는 뒤에서 하나씩 그린다(창이 멈추지 않게). 목록이 다시 그려졌으면 버린다.
-        private void LoadThumbnail(SceneDefinition scene, Border target, int version)
+        private void LoadThumbnail(SceneDefinition scene, Border target, int version, bool sub, SceneView view)
         {
             DateTime written;
             try { written = System.IO.File.GetLastWriteTimeUtc(SceneLibrary.ScenePath(scene.Id)); }
             catch (Exception) { return; }
+            int width = (int)target.Width, height = (int)target.Height;
+            string key = scene.Id + "|" + (sub ? "sub" : "main") + "|" + width + "x" + height
+                + (view != null ? "|" + view.OriginX + "," + view.OriginY + "," + view.CanvasWidth + "," + view.CanvasHeight + "," + view.Mirror : "");
             KeyValuePair<DateTime, BitmapSource> cached;
             lock (thumbnails)
-                if (thumbnails.TryGetValue(scene.Id, out cached) && cached.Key == written) { target.Child = Thumbnail(cached.Value); return; }
-            int quality = preferences.EffectQuality;
+                if (thumbnails.TryGetValue(key, out cached) && cached.Key == written) { target.Child = Thumbnail(cached.Value); return; }
+            double quality = preferences.EffectQuality;
             Task.Run(() =>
             {
                 // 그리기는 한 번에 하나씩(renderGate). 목록 잠금(thumbnails)은 짧게만 잡아 창이 기다리지 않게 한다.
@@ -321,9 +414,10 @@ namespace Wallpaper
                 {
                     KeyValuePair<DateTime, BitmapSource> done;
                     lock (thumbnails)
-                        if (thumbnails.TryGetValue(scene.Id, out done) && done.Key == written) return done.Value;
-                    var image = WallpaperScene.Still(scene, ThumbWidth, ThumbHeight, 6f, quality);
-                    lock (thumbnails) thumbnails[scene.Id] = new KeyValuePair<DateTime, BitmapSource>(written, image);
+                        if (thumbnails.TryGetValue(key, out done) && done.Key == written) return done.Value;
+                    // 가는 선이 많은 장면도 깨지지 않게 크게(8배) 그려 줄인다.
+                    var image = WallpaperScene.Still(scene, width * 8, height * 8, 6f, quality, sub, view != null ? view.Scaled(8) : null);
+                    lock (thumbnails) thumbnails[key] = new KeyValuePair<DateTime, BitmapSource>(written, image);
                     return image;
                 }
             }).ContinueWith(task =>
@@ -333,7 +427,12 @@ namespace Wallpaper
             }, TaskScheduler.FromCurrentSynchronizationContext());
         }
 
-        private static Image Thumbnail(BitmapSource image) { return new Image { Source = image, Stretch = Stretch.UniformToFill }; }
+        private static Image Thumbnail(BitmapSource image)
+        {
+            var view = new Image { Source = image, Stretch = Stretch.UniformToFill };
+            RenderOptions.SetBitmapScalingMode(view, BitmapScalingMode.HighQuality);   // 크게 그린 그림을 부드럽게 줄인다
+            return view;
+        }
 
         private void Rename(SceneDefinition scene)
         {
@@ -388,18 +487,19 @@ namespace Wallpaper
             panel.Children.Add(Label("성능 · 바꾸면 바로 적용됩니다", 0));
             var options = new StackPanel();
             options.Children.Add(OptionRow("프레임 제한", "높을수록 부드럽고 GPU를 더 씁니다. 디스플레이 주사율은 화면 갱신마다 그립니다.",
-                Choice("FrameLimit", new[] { "30 FPS", "60 FPS", "120 FPS", "디스플레이 주사율" },
+                Choice("FrameLimit", UserPreferences.FrameLimits.Select(fps => fps == 0 ? "디스플레이 주사율" : fps + " FPS").ToArray(),
                     Array.IndexOf(UserPreferences.FrameLimits, preferences.FrameLimit),
                     index => preferences.FrameLimit = UserPreferences.FrameLimits[index])));
             options.Children.Add(Divider());
             options.Children.Add(OptionRow("렌더 해상도", "배경을 낮은 해상도로 그린 뒤 확대합니다. 위젯은 항상 원래 해상도로 선명합니다.",
-                Choice("RenderScale", new[] { "100% (선명)", "75%", "50% (절약)" },
+                Choice("RenderScale", UserPreferences.RenderScales.Select(scale => Math.Round(scale * 100) + "%" + (scale == 1 ? " (선명)" : "")).ToArray(),
                     Array.IndexOf(UserPreferences.RenderScales, preferences.RenderScale),
                     index => preferences.RenderScale = UserPreferences.RenderScales[index])));
             options.Children.Add(Divider());
-            options.Children.Add(OptionRow("효과 품질", "낮출수록 입자 수와 잡음 계산을 줄입니다. 낮음에서는 유리 같은 후처리 레이어를 건너뜁니다.",
-                Choice("EffectQuality", new[] { "높음", "보통", "낮음" }, 2 - preferences.EffectQuality,
-                    index => preferences.EffectQuality = 2 - index)));
+            options.Children.Add(OptionRow("효과 품질", "낮출수록 입자 수(최고 100%·높음 80%·보통 60%·낮음 45%·최저 30%)와 잡음 계산을 줄입니다. 최저에서는 유리 같은 후처리 레이어를 건너뜁니다.",
+                Choice("EffectQuality", new[] { "최고", "높음", "보통", "낮음", "최저" },
+                    Array.IndexOf(UserPreferences.EffectQualities, preferences.EffectQuality),
+                    index => preferences.EffectQuality = UserPreferences.EffectQualities[index])));
             panel.Children.Add(Card(options));
 
             var pauses = new StackPanel();
@@ -420,35 +520,50 @@ namespace Wallpaper
         public void RefreshDisplays()
         {
             displays = host.Displays().ToList();
-            if (device == null || !displays.Any(d => d.Device == device)) device = displays.Count > 0 ? displays[0].Device : null;
+            var main = MainEntry;
+            var subs = SubEntries;
+            if (device == null || !displays.Any(d => d.Device == device)) device = main != null ? main.Device : displays.Count > 0 ? displays[0].Device : null;
             loading = true;
-            foreach (var picker in pickers)
+            mainChoice.Items.Clear();
+            foreach (var display in displays) mainChoice.Items.Add(display.Name + (display.Primary ? " (Windows 주 모니터)" : ""));
+            mainChoice.SelectedIndex = displays.FindIndex(d => d.Main);
+            mainInfo.Text = main != null ? Info(main) : "연결된 디스플레이가 없습니다.";
+            subRows.Children.Clear();
+            if (subs.Count == 0)
+                subRows.Children.Add(new TextBlock { Text = "연결된 서브 모니터가 없습니다. 메인만 그립니다.", Style = ModernTheme.Style("Bae.Text.Subtitle"), Margin = new Thickness(0, 12, 0, 12) });
+            for (int i = 0; i < subs.Count; i++)
             {
-                picker.Items.Clear();
-                foreach (var display in displays) picker.Items.Add(display.Name + (display.Primary ? " (주)" : ""));
+                if (i > 0) subRows.Children.Add(Divider());
+                var target = subs[i].Device;
+                subRows.Children.Add(Row(subs[i].Name, Info(subs[i]), true, SmallButton("레이아웃 편집", "EditSubDisplay_" + i, () => host.OpenLayoutEditor(target))));
             }
+            widgetSubChoice.Items.Clear();
+            foreach (var display in subs) widgetSubChoice.Items.Add(display.Name);
+            scenes = host.Scenes();
+            sceneChoice.Items.Clear();
+            sceneChoice.Items.Add("Windows 배경화면");
+            foreach (var scene in scenes) sceneChoice.Items.Add(scene.Name);
+            var current = host.Scene() ?? "";
+            int chosen = scenes.ToList().FindIndex(scene => scene.Id == current);
+            if (chosen < 0 && current.Length > 0) sceneChoice.Items.Add(current + " (파일 없음)");
+            sceneChoice.SelectedIndex = chosen >= 0 ? chosen + 1 : current.Length > 0 ? sceneChoice.Items.Count - 1 : 0;
             loading = false;
             ShowSelected();
             RefreshScenes();
         }
 
+        // 위젯 탭: 고른 화면(메인/서브) 표시와 위젯 목록
         private void ShowSelected()
         {
             loading = true;
-            int index = displays.FindIndex(d => d.Device == device);
-            foreach (var picker in pickers) picker.SelectedIndex = index;
-            var display = index >= 0 ? displays[index] : null;
-            displayInfo.Text = display != null
-                ? display.Width + " × " + display.Height + " · 배경: " + display.Background + " · 위젯 " + display.Widgets + "개"
-                : "연결된 디스플레이가 없습니다.";
-            scenes = host.Scenes();
-            backgroundChoice.Items.Clear();
-            backgroundChoice.Items.Add("Windows 배경화면");
-            foreach (var scene in scenes) backgroundChoice.Items.Add(scene.Name);
-            var current = device != null ? host.Background(device) ?? "" : "";
-            int chosen = scenes.ToList().FindIndex(scene => scene.Id == current);
-            if (chosen < 0 && current.Length > 0) backgroundChoice.Items.Add(current + " (파일 없음)");
-            backgroundChoice.SelectedIndex = chosen >= 0 ? chosen + 1 : current.Length > 0 ? backgroundChoice.Items.Count - 1 : 0;
+            var main = MainEntry;
+            var subs = SubEntries;
+            bool onMain = main != null && device == main.Device;
+            widgetMainButton.Style = ModernTheme.Style(onMain ? (object)"AccentButton" : typeof(Button));
+            widgetSubButton.Style = ModernTheme.Style(!onMain && subs.Count > 0 ? (object)"AccentButton" : typeof(Button));
+            widgetSubButton.IsEnabled = subs.Count > 0;
+            widgetSubChoice.Visibility = subs.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+            widgetSubChoice.SelectedIndex = subs.FindIndex(d => d.Device == device);
             RefreshWidgets();
             loading = false;
         }

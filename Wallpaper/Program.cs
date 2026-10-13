@@ -175,15 +175,29 @@ namespace Wallpaper
             get { return monitors.Values.OrderByDescending(m => m.Screen.Primary).ThenBy(m => m.Screen.DeviceName); }
         }
 
+        // 메인 모니터: 설정에서 고른 화면이 연결돼 있으면 그것, 아니면 Windows 주 모니터. 나머지는 서브다.
+        private Forms.Screen MainScreen(Forms.Screen[] screens)
+        {
+            return screens.FirstOrDefault(s => s.DeviceName == preferences.MainDisplay) ?? screens.FirstOrDefault(s => s.Primary) ?? screens.FirstOrDefault();
+        }
+
+        // 화면이 그릴 배경(세트 id · 메인 · 모든 화면의 배치). 달라지면 장면을 다시 만든다.
+        private string SceneKey(Forms.Screen screen, Forms.Screen main, Forms.Screen[] screens)
+        {
+            if (String.IsNullOrEmpty(preferences.Scene)) return "";
+            return preferences.Scene + "|" + screen.DeviceName + "|" + main.DeviceName + "|" + String.Join(";", screens.Select(s => s.Bounds.ToString()));
+        }
+
         // 연결된 화면마다 위젯 묶음을 만들고, 끊긴 화면·배경이 바뀐 화면은 없앤다.
         private void SyncMonitors(bool firstRun = false)
         {
             var screens = Forms.Screen.AllScreens;
+            var main = MainScreen(screens);
             foreach (var monitor in monitors.Values.ToArray())
             {
                 var screen = screens.FirstOrDefault(s => s.DeviceName == monitor.Screen.DeviceName);
                 if (screen == null || preferences.Display(screen.DeviceName) != monitor.Layout ||
-                    monitor.Background != monitor.Layout.Background ||
+                    monitor.SceneKey != SceneKey(screen, main, screens) ||
                     (monitor.Scene != null && (screen.Bounds != monitor.Screen.Bounds || monitor.RenderScale != preferences.RenderScale)))
                 {
                     DestroyMonitor(monitor);
@@ -203,22 +217,27 @@ namespace Wallpaper
                     layout = new DisplayLayout { Device = screen.DeviceName, ClockEnabled = start, CalendarEnabled = start };
                     preferences.Displays.Add(layout);
                 }
-                CreateMonitor(screen, layout);
+                CreateMonitor(screen, layout, main, screens);
             }
         }
 
-        private void CreateMonitor(Forms.Screen screen, DisplayLayout layout)
+        private void CreateMonitor(Forms.Screen screen, DisplayLayout layout, Forms.Screen main, Forms.Screen[] screens)
         {
-            var monitor = new MonitorRuntime { Screen = screen, Layout = layout, Backdrop = WallpaperBackdrop.Load(screen), Background = layout.Background };
+            var monitor = new MonitorRuntime { Screen = screen, Layout = layout, Backdrop = WallpaperBackdrop.Load(screen), SceneKey = SceneKey(screen, main, screens) };
             monitors.Add(screen.DeviceName, monitor);
-            if (!String.IsNullOrEmpty(layout.Background))
+            if (monitor.SceneKey.Length > 0)
             {
-                // 움직이는 배경을 만들 수 없으면 Windows 배경화면으로 표시한다.
+                // 움직이는 배경을 만들 수 없으면 Windows 배경화면으로 표시한다. 옆 모니터는 메인 풍경을 이어서, 아래 등 나머지는
+                // 세트의 서브 구성을 메인과의 위치에 맞춰 그린다.
                 try
                 {
-                    var definition = SceneLibrary.Scene(layout.Background);
-                    if (definition == null) throw new FileNotFoundException("장면 파일이 없습니다: scenes\\" + layout.Background + ".json");
-                    monitor.Scene = new WallpaperScene(screen, definition, preferences.FrameLimit, preferences.RenderScale, preferences.EffectQuality);
+                    var definition = SceneLibrary.Scene(preferences.Scene);
+                    if (definition == null) throw new FileNotFoundException("장면 파일이 없습니다: scenes\\" + preferences.Scene + ".json");
+                    bool sub; string role;
+                    monitor.View = SceneView.Arrange(definition, main.Bounds, screen.Bounds, screens.Select(s => s.Bounds).ToList(), out sub, out role);
+                    monitor.IsSub = sub;
+                    monitor.Role = role;
+                    monitor.Scene = new WallpaperScene(screen, definition, monitor.IsSub, monitor.View, preferences.FrameLimit, preferences.RenderScale, preferences.EffectQuality);
                     monitor.SceneDefinition = definition;
                     monitor.RenderScale = preferences.RenderScale;
                     monitor.Scene.Paused = userPaused;
@@ -301,12 +320,15 @@ namespace Wallpaper
         IList<SceneDefinition> ISettingsHost.Scenes() { return SceneLibrary.Scenes(); }
         IList<WidgetScript> ISettingsHost.ScriptTypes() { return WidgetScript.All(); }
         void ISettingsHost.ApplyPerformance() { ApplyPerformance(); }
-        void ISettingsHost.ChangeBackground(string device, string background) { ChangeBackground(device, background); }
+        string ISettingsHost.Scene() { return preferences.Scene; }
+        void ISettingsHost.ChangeScene(string scene) { ChangeScene(scene); }
 
-        string ISettingsHost.Background(string device)
+        void ISettingsHost.ChangeMainDisplay(string device)
         {
-            var layout = preferences.Display(device);
-            return layout == null ? "" : layout.Background;
+            if (preferences.MainDisplay == device) return;
+            preferences.MainDisplay = device;
+            preferences.Save();
+            SyncMonitors();
         }
 
         void ISettingsHost.OpenLayoutEditor(string device)
@@ -360,13 +382,13 @@ namespace Wallpaper
 
         IList<string> ISettingsHost.SceneUsers(string scene)
         {
-            return preferences.Displays.Where(d => d.Background == scene).Select(d => DisplayName(d.Device)).OrderBy(n => n).ToList();
+            return preferences.Scene == scene ? OrderedMonitors.Select(m => DisplayName(m.Screen.DeviceName)).ToList() : new List<string>();
         }
 
         // 장면 삭제: 그 장면을 쓰던 화면은 Windows 배경화면으로 돌리고 저장한 뒤 파일을 지운다.
         void ISettingsHost.DeleteScene(string scene)
         {
-            foreach (var layout in preferences.Displays.Where(d => d.Background == scene)) layout.Background = "";
+            if (preferences.Scene == scene) preferences.Scene = "";
             SavePreferences();
             SyncMonitors();
             SceneLibrary.DeleteScene(scene);
@@ -378,20 +400,26 @@ namespace Wallpaper
         // 설정 창의 디스플레이 목록: 이름·해상도·배경·켜진 위젯 수
         private IEnumerable<SettingsWindow.DisplayEntry> DisplayEntries()
         {
+            var main = MainScreen(Forms.Screen.AllScreens);
             foreach (var monitor in OrderedMonitors)
             {
                 string background = "Windows 배경화면";
-                if (!String.IsNullOrEmpty(monitor.Background))
+                if (monitor.SceneKey.Length > 0)
                 {
-                    SceneDefinition scene = null;
-                    try { scene = SceneLibrary.Scene(monitor.Background); }
-                    catch (Exception) { }
-                    background = (scene != null ? scene.Name : monitor.Background) + (monitor.Scene == null ? " (오류 — Windows 배경화면으로 표시 중)" : "");
+                    var scene = monitor.SceneDefinition;
+                    background = (scene == null ? preferences.Scene + " (오류 — Windows 배경화면으로 표시 중)"
+                        : monitor.Scene == null ? scene.Name + " (오류 — Windows 배경화면으로 표시 중)"
+                        : !scene.HasSub ? (monitor.Role == "main" ? "메인" : "같은 장면을 따로")
+                        : monitor.Role == "main" ? "메인 구성"
+                        : monitor.Role == "left" ? "옆 모니터(왼쪽): 메인 풍경이 이어짐"
+                        : monitor.Role == "right" ? "옆 모니터(오른쪽): 메인 풍경이 이어짐"
+                        : SubModeName(scene));
                 }
                 yield return new SettingsWindow.DisplayEntry
                 {
                     Device = monitor.Screen.DeviceName, Name = DisplayName(monitor.Screen.DeviceName), Primary = monitor.Screen.Primary,
-                    Width = monitor.Screen.Bounds.Width, Height = monitor.Screen.Bounds.Height, Background = background,
+                    Main = main != null && monitor.Screen.DeviceName == main.DeviceName, Role = monitor.Role,
+                    X = monitor.Screen.Bounds.X, Y = monitor.Screen.Bounds.Y, Width = monitor.Screen.Bounds.Width, Height = monitor.Screen.Bounds.Height, Background = background,
                     Widgets = monitor.Widgets.Keys.Count(monitor.Layout.IsEnabled)
                 };
             }
@@ -409,17 +437,21 @@ namespace Wallpaper
             if (monitors.Values.Any(m => m.Scene != null && m.RenderScale != preferences.RenderScale)) SyncMonitors();
         }
 
-        // 설정 창에서 배경을 바꾸면 저장하고 그 화면을 다시 만든다.
-        private void ChangeBackground(string device, string background)
+        private static string SubModeName(SceneDefinition scene)
         {
-            var layout = preferences.Display(device);
-            if (layout == null || layout.Background == (background ?? "")) return;
-            var previous = layout.Background;
-            layout.Background = background ?? "";
+            return scene.SubMode == "mirror" ? "서브: 메인을 비추는 수면" : scene.SubMode == "continue" ? "서브: 메인 아래로 이어짐" : "서브: 같은 장면을 따로";
+        }
+
+        // 설정 창에서 배경 세트를 바꾸면 저장하고 모든 화면을 다시 만든다.
+        private void ChangeScene(string scene)
+        {
+            if (preferences.Scene == (scene ?? "")) return;
+            var previous = preferences.Scene;
+            preferences.Scene = scene ?? "";
             try { preferences.Save(); }
             catch (Exception error)
             {
-                layout.Background = previous;
+                preferences.Scene = previous;
                 MessageBox.Show("배경을 저장하지 못했습니다.\n" + error.Message, "Wallpaper");
                 return;
             }
@@ -430,7 +462,7 @@ namespace Wallpaper
         private void ReloadScenes()
         {
             if (shuttingDown) return;
-            Func<MonitorRuntime, bool> scripted = m => !String.IsNullOrEmpty(m.Background) || m.Layout.Scripts.Count > 0;
+            Func<MonitorRuntime, bool> scripted = m => m.SceneKey.Length > 0 || m.Layout.Scripts.Count > 0;
             var reopen = editing != null && scripted(editing) ? editing.Screen.DeviceName : null;
             foreach (var monitor in monitors.Values.Where(scripted).ToArray()) DestroyMonitor(monitor);
             SyncMonitors();
@@ -480,7 +512,7 @@ namespace Wallpaper
                 try
                 {
                     var bounds = monitor.Screen.Bounds;
-                    return WallpaperScene.Still(monitor.SceneDefinition, bounds.Width, bounds.Height, monitor.Scene.Time, preferences.EffectQuality);
+                    return WallpaperScene.Still(monitor.SceneDefinition, bounds.Width, bounds.Height, monitor.Scene.Time, preferences.EffectQuality, monitor.IsSub, monitor.View);
                 }
                 catch (Exception error) { SceneLibrary.LogError("편집 창 배경 미리보기 실패: " + error.Message); }
             }
@@ -769,7 +801,10 @@ namespace Wallpaper
             public WallpaperBackdrop Backdrop;
             public WallpaperScene Scene;
             public SceneDefinition SceneDefinition;
-            public string Background;
+            public string SceneKey = "";
+            public bool IsSub;
+            public string Role = "";
+            public SceneView View;
             public double RenderScale = 1;
             public FlipClock ClockView;
             public CalendarView CalendarView;

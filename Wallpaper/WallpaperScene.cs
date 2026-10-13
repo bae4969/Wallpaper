@@ -31,14 +31,16 @@ namespace Wallpaper
         // 레이어는 layerWidth×layerHeight(렌더 해상도 배율 적용)로 그리고, 배율이 1보다 작으면 출력 크기로 확대한 뒤 위젯을 합성한다.
         private readonly int layerWidth, layerHeight;
         private long frameTicks;
-        private volatile int quality = 2;
+        private volatile float quality = 2;
         private long frameCount;
         private readonly object gate = new object();
         private readonly Dictionary<object, WidgetFrame> frames = new Dictionary<object, WidgetFrame>();
         private readonly ManualResetEventSlim running = new ManualResetEventSlim(true);
         private readonly Thread thread;
         private volatile bool stopping;
-        private readonly Stopwatch clock = Stopwatch.StartNew();
+        // 모든 화면이 같은 시계를 써서 메인·서브(이어지기·반사)가 같은 순간을 그린다.
+        private static readonly Stopwatch clock = Stopwatch.StartNew();
+        private readonly SceneView view;
 
         private ID3D11Device device;
         private ID3D11DeviceContext context;
@@ -49,11 +51,12 @@ namespace Wallpaper
         private ID3D11Buffer constants;
         private ID3D11SamplerState sampler;
         private ID3D11BlendState opaque, premultiplied, additive, maximum;
+        private ID3D11RasterizerState noCull;
         private ID3D11VertexShader fullscreenVertex, widgetVertex;
         private ID3D11PixelShader widgetShadow, widgetMask, widgetPixel, upscalePixel;
         private readonly List<Layer> layers = new List<Layer>();
         private readonly Dictionary<object, WidgetTextures> textures = new Dictionary<object, WidgetTextures>();
-        private readonly float[] values = new float[40];
+        private readonly float[] values = new float[44];
 
         // 초당 프레임 제한. 0 이거나 주사율 이상이면 수직동기에 맡긴다. 그리는 중에도 바꿀 수 있다.
         public int FrameLimit
@@ -61,11 +64,17 @@ namespace Wallpaper
             set { Interlocked.Exchange(ref frameTicks, value > 0 && value < refreshRate ? Stopwatch.Frequency / value : 0); }
         }
 
-        // 효과 품질 0=낮음 1=보통 2=높음: 입자 수를 줄이고, 낮음에서는 post 레이어(유리 등)를 건너뛴다. 셰이더에는 Quality 로 전달된다.
-        public int Quality
+        // 효과 품질 0(최저)~2(최고), 0.5 단위: 입자 수를 줄이고, 최저(0)에서는 post 레이어(유리 등)를 건너뛴다. 셰이더에는 Quality 로 전달된다.
+        public double Quality
         {
-            set { quality = Math.Max(0, Math.Min(2, value)); }
+            set { quality = (float)Math.Max(0, Math.Min(2, value)); }
         }
+
+        // 옆 모니터까지 입자가 퍼질 때 메인 밀도를 유지하도록 늘리는 배율(가로 범위 ÷ 캔버스 폭)
+        private float SpanFactor { get { return Math.Max(1f, view.SpanWidth / Math.Max(1f, view.CanvasWidth)); } }
+
+        // 효과 품질별 입자 수 비율: 최고 100%·높음 80%·보통 60%·낮음 45%·최저 30%
+        private float ParticleRatio { get { return quality >= 2 ? 1f : quality >= 1.5f ? 0.8f : quality >= 1 ? 0.6f : quality >= 0.5f ? 0.45f : 0.3f; } }
 
         // 지금까지 그린 프레임 수(측정용)
         public long FrameCount { get { return Interlocked.Read(ref frameCount); } }
@@ -83,11 +92,13 @@ namespace Wallpaper
 
         private IntPtr Outer { get { return holder != null ? holder.Handle : surface.Handle; } }
 
-        public WallpaperScene(Forms.Screen screen, SceneDefinition scene, int frameLimit, double renderScale, int effectQuality)
+        // sub 면 장면의 서브 레이어를 그린다. view 는 캔버스(메인 화면)에서 이 화면이 놓인 자리(null 이면 이 화면 자체가 캔버스).
+        public WallpaperScene(Forms.Screen screen, SceneDefinition scene, bool sub, SceneView view, int frameLimit, double renderScale, double effectQuality)
         {
             bounds = screen.Bounds;
             width = bounds.Width;
             height = bounds.Height;
+            this.view = view ?? SceneView.Whole(width, height);
             layerWidth = Math.Max(1, (int)Math.Round(width * renderScale));
             layerHeight = Math.Max(1, (int)Math.Round(height * renderScale));
             refreshRate = Native.RefreshRate(screen.DeviceName);
@@ -108,7 +119,7 @@ namespace Wallpaper
                     throw new InvalidOperationException("바탕화면에 레이어 창을 만들지 못했습니다.");
                 surface = new HostWindow(holder.Handle, 0, 0, width, height, Child | ClipSiblings, ExNoActivate | ExToolWindow | ExTransparent);
                 CreateDevice();
-                BuildLayers(scene);
+                BuildLayers(scene, sub);
                 RenderFrame();
                 KeepUnderIcons();
                 Native.ShowWindow(surface.Handle, 8);
@@ -126,14 +137,15 @@ namespace Wallpaper
         }
 
         // 바탕화면 창 없이 텍스처에만 그린다(--render, --validate).
-        private WallpaperScene(int width, int height, SceneDefinition scene)
+        private WallpaperScene(int width, int height, SceneDefinition scene, bool sub = false, SceneView view = null)
         {
             this.width = layerWidth = width;
             this.height = layerHeight = height;
+            this.view = view ?? SceneView.Whole(width, height);
             try
             {
                 CreateDevice();
-                BuildLayers(scene);
+                BuildLayers(scene, sub);
             }
             catch
             {
@@ -146,23 +158,24 @@ namespace Wallpaper
         public static void Validate(SceneDefinition scene)
         {
             new WallpaperScene(64, 64, scene).ReleaseDevice();
+            if (scene.HasSub) new WallpaperScene(64, 64, scene, true).ReleaseDevice();
         }
 
         // 지금까지 흐른 장면 시간(초). 편집 창 미리보기가 같은 시점을 그릴 때 쓴다.
         public float Time { get { return (float)clock.Elapsed.TotalSeconds; } }
 
         // time 초 시점의 장면을 한 장 그린다(위젯 제외). 편집 창 배경 미리보기용.
-        public static System.Windows.Media.Imaging.BitmapSource Still(SceneDefinition scene, int width, int height, float time, int effectQuality)
+        public static System.Windows.Media.Imaging.BitmapSource Still(SceneDefinition scene, int width, int height, float time, double effectQuality, bool sub = false, SceneView view = null)
         {
-            var pixels = Render(scene, width, height, time, effectQuality);
+            var pixels = Render(scene, width, height, time, effectQuality, sub, view);
             var image = System.Windows.Media.Imaging.BitmapSource.Create(width, height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, pixels, width * 4);
             image.Freeze();
             return image;
         }
 
-        private static byte[] Render(SceneDefinition scene, int width, int height, float time, int effectQuality)
+        private static byte[] Render(SceneDefinition scene, int width, int height, float time, double effectQuality, bool sub, SceneView view)
         {
-            var offscreen = new WallpaperScene(width, height, scene);
+            var offscreen = new WallpaperScene(width, height, scene, sub, view);
             offscreen.Quality = effectQuality;
             try
             {
@@ -173,9 +186,20 @@ namespace Wallpaper
         }
 
         // time 초 시점의 장면을 PNG로 저장한다(위젯 제외).
-        public static void RenderToFile(SceneDefinition scene, int width, int height, float time, string path, int effectQuality = 2)
+        public static void RenderToFile(SceneDefinition scene, int width, int height, float time, string path, double effectQuality = 2, bool sub = false, SceneView view = null)
         {
-            var pixels = Render(scene, width, height, time, effectQuality);
+            var pixels = Render(scene, width, height, time, effectQuality, sub, view);
+            SavePng(pixels, width, height, path);
+        }
+
+        // 화면 없이 그린 BGRA 픽셀을 PNG 로 저장한다.
+        public static byte[] RenderPixels(SceneDefinition scene, int width, int height, float time, double effectQuality, bool sub, SceneView view)
+        {
+            return Render(scene, width, height, time, effectQuality, sub, view);
+        }
+
+        public static void SavePng(byte[] pixels, int width, int height, string path)
+        {
             using (var bitmap = new System.Drawing.Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
             {
                 var data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.WriteOnly, bitmap.PixelFormat);
@@ -206,12 +230,13 @@ namespace Wallpaper
             }
         }
 
-        private void BuildLayers(SceneDefinition scene)
+        private void BuildLayers(SceneDefinition scene, bool sub)
         {
             var types = new Dictionary<string, LayerType>();
-            for (int i = 0; i < scene.Layers.Length; i++)
+            var list = scene.LayersFor(sub);
+            for (int i = 0; i < list.Length; i++)
             {
-                var definition = scene.Layers[i];
+                var definition = list[i];
                 JsonElement typeName;
                 string name = definition.TryGetProperty("type", out typeName) && typeName.ValueKind == JsonValueKind.String ? typeName.GetString() : "";
                 try
@@ -222,7 +247,7 @@ namespace Wallpaper
                 }
                 catch (Exception error)
                 {
-                    throw new InvalidDataException(scene.Id + " 레이어 " + (i + 1) + " (" + name + "): " + error.Message, error);
+                    throw new InvalidDataException(scene.Id + (sub ? " 서브" : "") + " 레이어 " + (i + 1) + " (" + name + "): " + error.Message, error);
                 }
             }
         }
@@ -407,8 +432,15 @@ namespace Wallpaper
         private void Apply(float time, float seed, bool clear = true, bool layer = false)
         {
             if (clear) Array.Clear(values, 4, 32);
-            values[0] = layer ? layerWidth : width; values[1] = layer ? layerHeight : height; values[2] = time; values[3] = seed;
+            // 레이어는 캔버스 좌표로 그린다(렌더 해상도 배율 적용). 위젯·확대 단계는 화면 그대로.
+            float sx = layer ? layerWidth / (float)width : 1, sy = layer ? layerHeight / (float)height : 1;
+            values[0] = layer ? view.CanvasWidth * sx : width; values[1] = layer ? view.CanvasHeight * sy : height;
+            values[2] = time; values[3] = seed;
             values[36] = quality;
+            values[37] = layer && view.Mirror ? 1 : 0;
+            values[38] = layer ? layerWidth : width; values[39] = layer ? layerHeight : height;
+            values[40] = layer ? view.OriginX * sx : 0; values[41] = layer ? view.OriginY * sy : 0;
+            values[42] = layer ? view.SpanLeft * sx : 0; values[43] = layer ? view.SpanWidth * sx : width;
             context.UpdateSubresource(values, constants);
             context.VSSetConstantBuffer(0, constants);
             context.PSSetConstantBuffer(0, constants);
@@ -468,6 +500,9 @@ namespace Wallpaper
             max.RenderTarget[0].BlendOperation = BlendOperation.Max;
             max.RenderTarget[0].BlendOperationAlpha = BlendOperation.Max;
             maximum = device.CreateBlendState(max);
+            // 입자 VS가 사각형을 회전·반전해도(예: streak) 뒷면으로 잘리지 않게 면 제거를 끈다.
+            noCull = device.CreateRasterizerState(RasterizerDescription.CullNone);
+            context.RSSetState(noCull);
             // 위젯 합성 셰이더는 사용자 폴더가 아닌 실행파일 내장본(common.hlsli + WidgetShaders.hlsl)으로 만든다.
             var internalSource = SceneLibrary.EmbeddedText("layers/common.hlsli") + "\n" + InternalShaders();
             fullscreenVertex = device.CreateVertexShader(Compile(internalSource, "FullscreenVS", "vs_5_0", "WidgetShaders.hlsl"));
@@ -509,13 +544,13 @@ namespace Wallpaper
             foreach (var layer in layers) layer.Dispose();
             layers.Clear();
             var resources = new IDisposable[] { upscalePixel, outputTarget, outputTexture, sceneView, widgetPixel, widgetMask, widgetShadow, widgetVertex, fullscreenVertex,
-                maximum, additive, premultiplied, opaque, sampler, constants, maskView, maskTarget, maskTexture, belowView, belowTexture,
+                noCull, maximum, additive, premultiplied, opaque, sampler, constants, maskView, maskTarget, maskTexture, belowView, belowTexture,
                 sceneTarget, sceneTexture, backBuffer, swapChain };
             foreach (var resource in resources) if (resource != null) resource.Dispose();
             if (context != null) { context.ClearState(); context.Flush(); context.Dispose(); }
             if (device != null) device.Dispose();
             widgetPixel = null; widgetMask = null; widgetShadow = null; widgetVertex = null; fullscreenVertex = null;
-            maximum = additive = premultiplied = opaque = null; sampler = null; constants = null; maskView = null; maskTarget = null;
+            noCull = null; maximum = additive = premultiplied = opaque = null; sampler = null; constants = null; maskView = null; maskTarget = null;
             maskTexture = null; belowView = null; belowTexture = null; sceneTarget = null; sceneTexture = null; backBuffer = null;
             swapChain = null; context = null; device = null;
             upscalePixel = null; outputTarget = null; outputTexture = null; sceneView = null;
@@ -642,7 +677,7 @@ namespace Wallpaper
             {
                 var context = scene.context;
                 bool below = kind == "post";
-                if (below && scene.quality == 0) return;
+                if (below && scene.quality <= 0) return;
                 if (below)
                 {
                     // 아래 레이어 결과를 복사해 흐림 단계(mip)를 만든 뒤 그 위에 다시 그린다.
@@ -658,7 +693,7 @@ namespace Wallpaper
                 context.VSSetShader(vertex);
                 context.PSSetShader(pixel);
                 if (kind == "particles")
-                    context.DrawInstanced(6, (uint)Math.Max(1, Math.Round(count * (scene.quality == 2 ? 1 : scene.quality == 1 ? 0.6 : 0.3))), 0, 0);
+                    context.DrawInstanced(6, (uint)Math.Max(1, Math.Round(count * scene.ParticleRatio * scene.SpanFactor)), 0, 0);
                 else context.Draw(3, 0);
                 if (below) context.PSSetShaderResource(0, null);
             }

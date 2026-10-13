@@ -16,13 +16,23 @@ namespace Wallpaper
 
         public readonly List<DisplayLayout> Displays = new List<DisplayLayout>();
         // 움직이는 배경 성능: 프레임 제한(0 = 디스플레이 주사율)과 렌더 해상도 배율(위젯은 항상 원래 해상도)
-        public static readonly int[] FrameLimits = { 30, 60, 120, 0 };
-        public static readonly double[] RenderScales = { 1, 0.75, 0.5 };
+        public static readonly int[] FrameLimits = { 15, 20, 24, 30, 40, 45, 50, 60, 72, 90, 100, 120, 144, 0 };
+        public static readonly double[] RenderScales = { 1, 0.9, 0.8, 0.75, 0.7, 0.6, 0.5, 0.4, 0.33, 0.25 };
+        // 효과 품질: 높은 것부터 최고·높음·보통·낮음·최저. 예전 저장값 2·1·0(높음·보통·낮음)은 최고·보통·최저로 읽힌다.
+        public static readonly double[] EffectQualities = { 2, 1.5, 1, 0.5, 0 };
         public int FrameLimit = 60;
         public double RenderScale = 1;
-        public int EffectQuality = 2;            // 0=낮음 1=보통 2=높음
+        public double EffectQuality = 2;
         public bool PauseWhenCovered = true;     // 창이 화면을 덮으면 멈춤
         public bool PauseOnBattery = true;       // 배터리로 작동할 때 멈춤
+        // 배경 세트(장면 id, 빈 값은 Windows 배경화면)와 메인 모니터(빈 값이면 Windows 주 모니터). 나머지 화면은 서브 구성을 쓴다.
+        public string Scene = "";
+        public string MainDisplay = "";
+        // 2세트로 합친 예전 서브 전용 장면 → 세트 id
+        private static readonly Dictionary<string, string> MergedScenes = new Dictionary<string, string>
+        {
+            { "aurora-lake", "aurora-sky" }, { "neon-river", "neon-skyline" }, { "sky-mirror-reflection", "sky-mirror" }
+        };
 
         public DisplayLayout Display(string device)
         {
@@ -45,14 +55,22 @@ namespace Wallpaper
                 if (performance != null)
                 {
                     int fps = ReadInt(performance, "fps", 60, 0, 1000);
-                    double scale;
+                    double scale, quality;
                     settings.FrameLimit = FrameLimits.Contains(fps) ? fps : 60;
                     settings.RenderScale = Double.TryParse((string)performance.Attribute("scale"), NumberStyles.Float, CultureInfo.InvariantCulture, out scale)
                         && RenderScales.Contains(scale) ? scale : 1;
-                    settings.EffectQuality = ReadInt(performance, "quality", 2, 0, 2);
+                    settings.EffectQuality = Double.TryParse((string)performance.Attribute("quality"), NumberStyles.Float, CultureInfo.InvariantCulture, out quality)
+                        && EffectQualities.Contains(quality) ? quality : 2;
                     settings.PauseWhenCovered = ReadBool(performance, "pauseCovered", true);
                     settings.PauseOnBattery = ReadBool(performance, "pauseBattery", true);
                 }
+                var sceneElement = document.Element("scene");
+                if (sceneElement != null)
+                {
+                    settings.Scene = (string)sceneElement.Attribute("id") ?? "";
+                    settings.MainDisplay = (string)sceneElement.Attribute("main") ?? "";
+                }
+                var legacyBackgrounds = new List<string>();
                 foreach (var element in document.Elements("display"))
                 {
                     string device = (string)element.Attribute("device");
@@ -65,7 +83,7 @@ namespace Wallpaper
                         layout.ClockEnabled = layout.CalendarEnabled = false;
                         foreach (var widget in layout.Hardware) widget.Enabled = false;
                     }
-                    layout.Background = (string)element.Attribute("background") ?? "";
+                    legacyBackgrounds.Add((string)element.Attribute("background") ?? "");
                     settings.Displays.Add(layout);
                 }
                 // 이전 형식: 화면 하나의 장치 이름과 배치를 최상위에 저장했다.
@@ -76,6 +94,13 @@ namespace Wallpaper
                     var layout = ReadLayout(document);
                     layout.Device = legacy;
                     settings.Displays.Add(layout);
+                }
+                // 예전 형식: 화면마다 배경을 따로 골랐다. 처음 고른 장면을 세트로 옮긴다.
+                if (sceneElement == null)
+                {
+                    var first = legacyBackgrounds.FirstOrDefault(b => b.Length > 0) ?? "";
+                    string merged;
+                    settings.Scene = MergedScenes.TryGetValue(first, out merged) ? merged : first;
                 }
             }
             catch (XmlException) { }
@@ -94,10 +119,10 @@ namespace Wallpaper
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             new XElement("settings",
                 new XElement("performance", new XAttribute("fps", FrameLimit), new XAttribute("scale", RenderScale.ToString(CultureInfo.InvariantCulture)),
-                    new XAttribute("quality", EffectQuality), new XAttribute("pauseCovered", PauseWhenCovered), new XAttribute("pauseBattery", PauseOnBattery)),
+                    new XAttribute("quality", EffectQuality.ToString(CultureInfo.InvariantCulture)), new XAttribute("pauseCovered", PauseWhenCovered), new XAttribute("pauseBattery", PauseOnBattery)),
+                new XElement("scene", new XAttribute("id", Scene), new XAttribute("main", MainDisplay)),
                 Displays.Select(layout =>
                 new XElement("display", new XAttribute("device", layout.Device),
-                    new XAttribute("background", layout.Background),
                     WithOptions(WritePlacement("clock", layout.Clock, layout.ClockEnabled), layout.ClockOptions),
                     WithOptions(WritePlacement("calendar", layout.Calendar, layout.CalendarEnabled), layout.CalendarOptions),
                     new XElement("scriptWidgets", layout.Scripts.Select(widget =>
@@ -236,12 +261,10 @@ namespace Wallpaper
         }
     }
 
-    // 모니터 한 대의 위젯 구성과 배경. 연결이 끊겨도 보관한다.
+    // 모니터 한 대의 위젯 구성. 연결이 끊겨도 보관한다(배경은 UserPreferences.Scene 세트 하나).
     internal sealed class DisplayLayout
     {
         public string Device = "";
-        // 빈 값은 Windows 배경화면, 그 밖에는 움직이는 배경 장면 id
-        public string Background = "";
         public WidgetPlacement Clock;
         public WidgetPlacement Calendar;
         public bool ClockEnabled = true;
