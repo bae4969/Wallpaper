@@ -25,9 +25,10 @@ Wallpapers\
 ## 2. 작업 순서 (명령줄)
 
 ```
+Wallpaper.exe --help                         명령 요약
 Wallpaper.exe --list                         장면·레이어 종류·값 목록
 Wallpaper.exe --validate my-scene            컴파일 검사(실패하면 종료 코드 1, 오류에 레이어 번호·줄 번호)
-Wallpaper.exe --render my-scene out.png --time 3 --size 1920x1080 [--quality high|medium|low]
+Wallpaper.exe --render my-scene out.png --time 3 --size 1920x1080 [--quality high|medium|low|0~2]
                                                 한 프레임을 PNG로 저장해 결과를 본다(위젯 제외)
 Wallpaper.exe --render path\to\draft.json out.png   폴더 밖 파일도 바로 그려 볼 수 있다
 Wallpaper.exe --render my-scene sub.png --part sub --size 1920x1200 --main 3440x1440 --at 796,1440
@@ -71,7 +72,7 @@ Wallpaper.exe --render-set my-scene set.png --main 2560x1440 --screen 1920x1080@
 - 레이어 공통 값: `type`(필수, 레이어 종류 이름), `seed`(숫자 — 같은 종류를 여러 겹 쓸 때 배치를 바꾼다), `blend`(opaque|alpha|add — 종류의 기본값 대신), `comment`(메모).
 - 그 밖의 값은 레이어 종류의 `params`에 있는 이름만 쓸 수 있다. 오타는 검사 단계에서 "알 수 없는 값"으로 걸린다. 생략한 값은 기본값을 쓴다.
 - 값의 형태: 숫자, 색 `"#RRGGBB"` 또는 `"#RRGGBBAA"`, 숫자 배열 `[0.1, 0.2]`, 또는 `values`에 정의된 이름(예: `"shape": "streak"`).
-- 크기·길이 단위는 **1080p 기준 픽셀**이며 화면 높이에 비례해 맞춘다. 위치·높이는 화면 비율(0=위, 1=아래)이다.
+- 크기·길이 단위는 **1080p 기준 픽셀**이며 캔버스(메인 화면) 높이에 비례해 맞춘다. 위치·높이는 캔버스 비율(0=위, 1=아래)이다 — 서브·옆 모니터는 같은 값으로 이어진다(4.1절).
 
 ## 4. 기본 레이어 종류
 
@@ -148,7 +149,7 @@ Wallpaper.exe --render-set my-scene set.png --main 2560x1440 --screen 1920x1080@
 
 ```hlsl
 cbuffer Frame : register(b0) {
-    float2 Resolution;   // 화면 픽셀 크기
+    float2 Resolution;   // 캔버스 픽셀 크기(메인 화면 — 4.1절)
     float  Time;         // 초
     float  Seed;         // 장면에 적은 seed
     float4 P[8];         // 값 정의의 slot

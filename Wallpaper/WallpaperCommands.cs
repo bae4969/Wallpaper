@@ -40,7 +40,8 @@ Start-Process -Wait 로 실행한다(cmd·bash·파이썬 subprocess 는 출력�
 작업 순서(AI 포함):
   1) --guide 로 형식을 읽는다.  2) --folder 의 scenes\<id>.json 을 만들거나 고친다.
   3) --validate <id> 로 오류를 고친다.  4) --render <id> out.png --time 3 으로 결과를 본다.
-  5) 트레이 앱에서 디스플레이를 눌러 편집 창의 '배경'에서 고른다. 실행 중이면 파일을 저장할 때마다 바로 다시 그린다.
+  5) 트레이 → 설정 → 디스플레이 탭의 '배경 세트'에서 고른다. 실행 중이면 파일을 저장할 때마다 바로 다시 그린다.
+  확인: --render-set <id> out.png --main 3440x1440 --sub 1920x1200 --at 796,1440 으로 메인·서브 이음을 본다.
 ";
 
         public static int Run(string[] args)
