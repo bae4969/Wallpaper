@@ -1,0 +1,14 @@
+{
+  "name": "블랙홀",
+  "description": "별빛 가득한 우주에 떠 있는 거대한 블랙홀의 주황빛 강착원반이 중력렌즈로 휘어 검은 지평선을 감싸고, 서브 화면에는 옅은 성운과 별밭이 아래로 이어진다.",
+  "layers": [
+    {"type": "gradient", "top": "#020208", "bottom": "#05040C", "glow": "#140A12", "glowStrength": 0.5, "glowCenter": 0.45, "glowWidth": 0.5},
+    {"type": "nebula", "seed": 17, "blend": "add", "comment": "아주 옅은 성운", "colorA": "#1A2A6A", "colorB": "#4A1A3A", "colorC": "#6A3A1A", "brightness": 0.32, "density": 0.4, "dust": 0, "scale": 1100, "speed": 0.004, "warp": 2.0, "patchiness": 0.7, "centerFade": 0.2, "fillBelow": 1, "belowBrightness": 1.6},
+    {"type": "nebula", "seed": 23, "blend": "add", "comment": "서브 쪽 성운(메인에서는 거의 안 보이고 경계 아래로 서서히 짙어진다)", "colorA": "#24347A", "colorB": "#5A2450", "colorC": "#B05A28", "brightness": 0.03, "belowBrightness": 18, "density": 0.7, "dust": 0, "scale": 900, "speed": 0.004, "warp": 2.2, "patchiness": 0.4, "centerFade": 0.3, "fillBelow": 1},
+    {"type": "particles", "seed": 41, "count": 2400, "shape": "glow", "colorA": "#FFFFFF", "colorB": "#C6D4FF", "weightB": 0.6, "colorC": "#FFDDB8", "weightC": 0.4, "minSize": 1.5, "maxSize": 3.2, "opacity": 0.55, "twinkle": 0.45, "top": 0, "bottom": 2},
+    {"type": "particles", "seed": 42, "count": 180, "shape": "glow", "colorA": "#FFFFFF", "colorB": "#D0DEFF", "weightB": 0.6, "colorC": "#FFE2C0", "weightC": 0.4, "minSize": 3, "maxSize": 6, "opacity": 0.7, "twinkle": 0.35, "top": 0, "bottom": 2},
+    {"type": "blackhole", "centerX": 0.68, "centerY": 0.4, "size": 175, "tilt": 9, "inclination": 0.11, "diskSize": 6.5, "speed": 0.01, "doppler": 0.6, "brightness": 1.0, "lensing": 1.0, "glow": 0.8, "turbulence": 8, "contrast": 0.75, "hotColor": "#FFE2B0", "diskColor": "#FF6410", "glowColor": "#FF4A10"},
+    {"type": "vignette", "strength": 0.5, "radius": 0.5, "softness": 0.7}
+  ],
+  "sub": {"mode": "continue"}
+}

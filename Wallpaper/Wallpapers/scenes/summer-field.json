@@ -1,0 +1,28 @@
+{
+  "name": "여름 들판",
+  "description": "뭉게구름이 흘러가는 파란 여름 하늘 아래 초록 언덕과 바람에 물결치는 풀밭 — 서브 모니터에는 발밑까지 이어지는 키 큰 풀과 들꽃, 떠다니는 꽃씨가 보인다.",
+  "layers": [
+    {"type": "gradient", "top": "#2C6FD6", "bottom": "#CDE6F6", "glow": "#FFFFFF", "glowStrength": 0.25, "glowCenter": 0.78, "glowWidth": 0.18},
+    {"type": "sun", "x": 0.16, "y": 0.13, "size": 30, "haloSize": 70, "color": "#FFFFF4", "haloColor": "#FFE8A8", "glow": 0.5, "wideColor": "#FFF0C0", "wideGlow": 0.3, "rays": 0.06, "raySpeed": 0.03},
+    {"type": "clouds", "seed": 1, "light": "#FFFFFF", "shadow": "#A4B4CE", "rim": "#FFF8E8", "rimStrength": 0.35, "coverage": 0.56, "scale": 640, "speed": 0.008, "top": 0.0, "bottom": 0.76, "softness": 0.055, "perspective": 0.6, "stretch": 1.1, "lightX": -0.6, "lightY": 1, "shading": 0.5, "fade": 0.25},
+    {"type": "ridge", "seed": 3, "color": "#93BAB0", "ground": 0.82, "height": 0.16, "roughness": 0.85, "scale": 1000, "rim": "#E4F4F2", "rimStrength": 0.18},
+    {"type": "ridge", "seed": 5, "color": "#6FA458", "ground": 0.84, "height": 0.1, "roughness": 0.8, "scale": 750, "rim": "#C4E890", "rimStrength": 0.22},
+    {"type": "grass", "seed": 1, "color": "#1F4A16", "tip": "#B6D860", "tipMix": 0.85, "far": "#6FA050", "farMix": 0.55, "base": 0.84, "bladeHeight": 220, "density": 12, "bladeWidth": 9, "wind": 0.4, "windSpeed": 1, "gustSize": 420, "rowGap": 0.09, "rows": 3, "lightSide": -1},
+    {"type": "grass", "seed": 2, "comment": "가까운 풀 1줄(서브와 이어지는 줄 — 끝이 메인 아래쪽에 살짝 보인다)", "color": "#1F4A16", "tip": "#B6D860", "tipMix": 0.85, "base": 1.17, "bladeHeight": 250, "density": 10, "bladeWidth": 11, "wind": 0.4, "windSpeed": 1, "gustSize": 420, "rows": 1, "lightSide": -1, "flowers": 0.06, "flowerSize": 9, "baseShade": 0.85, "flowerColor": "#FFFFFF", "flowerCenter": "#F2C230"},
+    {"type": "particles", "seed": 3, "count": 40, "shape": "glow", "colorA": "#FFFBE8", "colorB": "#FFF2C0", "weightB": 0.5, "minSize": 4, "maxSize": 9, "opacity": 0.6, "velocityX": 0.012, "velocityY": -0.02, "speedJitter": 0.6, "twinkle": 0.5, "top": 0.45, "bottom": 1.0},
+    {"type": "vignette", "strength": 0.25, "radius": 0.6, "softness": 0.7}
+  ],
+  "sub": {
+    "mode": "continue",
+    "comment": "메인 아래로 이어지는 가까운 풀밭. 앞의 두 풀 레이어는 메인과 같은 값(경계에서 이어진다), 그 아래 줄일수록 풀이 크고 성기다.",
+    "layers": [
+      {"type": "grass", "seed": 1, "color": "#1F4A16", "tip": "#B6D860", "tipMix": 0.85, "far": "#6FA050", "farMix": 0.55, "base": 0.84, "bladeHeight": 220, "density": 12, "bladeWidth": 9, "wind": 0.4, "windSpeed": 1, "gustSize": 420, "rowGap": 0.09, "rows": 3, "lightSide": -1},
+      {"type": "grass", "seed": 2, "color": "#1F4A16", "tip": "#B6D860", "tipMix": 0.85, "base": 1.17, "bladeHeight": 250, "density": 10, "bladeWidth": 11, "wind": 0.4, "windSpeed": 1, "gustSize": 420, "rows": 1, "lightSide": -1, "flowers": 0.06, "flowerSize": 9, "baseShade": 0.85, "flowerColor": "#FFFFFF", "flowerCenter": "#F2C230"},
+      {"type": "grass", "seed": 3, "color": "#1E4815", "tip": "#B8DA62", "tipMix": 0.85, "base": 1.4, "bladeHeight": 340, "density": 7, "bladeWidth": 16, "wind": 0.42, "windSpeed": 1, "gustSize": 420, "rows": 1, "variation": 0.3, "lightSide": -1, "flowers": 0.09, "flowerSize": 14, "baseShade": 0.85, "flowerColor": "#FFC4DA", "flowerCenter": "#F2C230"},
+      {"type": "grass", "seed": 4, "color": "#1D4614", "tip": "#B8DA62", "tipMix": 0.85, "base": 1.66, "bladeHeight": 560, "density": 4.5, "bladeWidth": 24, "wind": 0.45, "windSpeed": 1, "gustSize": 420, "rows": 1, "variation": 0.3, "lightSide": -1, "flowers": 0.1, "flowerSize": 21, "baseShade": 0.85, "flowerColor": "#F6E36A", "flowerCenter": "#E08A20"},
+      {"type": "grass", "seed": 5, "color": "#1C4413", "tip": "#B8DA62", "tipMix": 0.85, "base": 1.98, "bladeHeight": 820, "density": 3, "bladeWidth": 34, "wind": 0.48, "windSpeed": 1, "gustSize": 420, "rows": 1, "variation": 0.3, "lightSide": -1, "flowers": 0.08, "flowerSize": 30, "baseShade": 0.85, "flowerColor": "#FFFFFF", "flowerCenter": "#F2C230"},
+      {"type": "petals", "seed": 11, "comment": "바람에 떠다니는 꽃씨", "count": 40, "shape": "snow", "colorA": "#FFFFFF", "colorB": "#FFF8E0", "weightB": 0.5, "minSize": 6, "maxSize": 18, "opacity": 0.85, "wind": 0.02, "fallSpeed": -0.015, "speedJitter": 0.5, "sway": 30, "swaySpeed": 0.6, "spin": 0, "flutter": 0, "depthBlur": 0.6, "gust": 0.6, "parallax": 0.6, "top": 1.0, "bottom": 2.1},
+      {"type": "vignette", "strength": 0.25, "radius": 0.6, "softness": 0.7}
+    ]
+  }
+}

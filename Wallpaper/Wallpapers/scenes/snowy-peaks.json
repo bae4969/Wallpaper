@@ -1,0 +1,34 @@
+{
+  "name": "눈보라 설산",
+  "description": "푸른 겨울 황혼, 눈 덮인 봉우리가 겹겹이 솟은 산맥 위로 눈보라가 비스듬히 몰아치고 산허리에 눈안개가 흐른다 — 서브 모니터에는 눈보라가 이어지는 가까운 눈 비탈과 바닥을 스치며 날리는 눈가루가 보인다.",
+  "layers": [
+    {"type": "gradient", "top": "#101C36", "bottom": "#8094B4", "glow": "#D9BCD2", "glowStrength": 0.3, "glowCenter": 0.6, "glowWidth": 0.18},
+    {"type": "ridge", "seed": 47, "comment": "먼 봉우리 - 눈", "color": "#DCE6F4", "ground": 0.92, "height": 0.5, "roughness": 0.85, "scale": 560, "rim": "#FFFFFF", "rimStrength": 0.35},
+    {"type": "ridge", "seed": 47, "comment": "먼 봉우리 - 바위: 같은 능선을 낮춰 덮어 높은 봉우리 끝에만 눈이 남는다", "color": "#7189AD", "ground": 0.822, "height": 0.36, "roughness": 0.85, "scale": 560},
+    {"type": "fog", "seed": 3, "color": "#C6D3E8", "opacity": 0.3, "scale": 1.5, "flowX": 0.035, "flowY": -0.004, "bottomBias": 0.7},
+    {"type": "ridge", "seed": 61, "comment": "중간 산 - 눈", "color": "#B0BFD7", "ground": 1.0, "height": 0.3, "roughness": 0.8, "scale": 520, "rim": "#F2F6FC", "rimStrength": 0.3},
+    {"type": "ridge", "seed": 61, "comment": "중간 산 - 바위", "color": "#465C82", "ground": 0.935, "height": 0.2, "roughness": 0.8, "scale": 520, "rim": "#E6EEFA", "rimStrength": 0.06},
+    {"type": "ridge", "seed": 62, "comment": "가까운 능선", "color": "#17233B", "ground": 1.0, "height": 0.14, "roughness": 0.7, "scale": 420, "rim": "#C3D4EC", "rimStrength": 0.12},
+    {"type": "petals", "seed": 1, "comment": "먼 눈(메인·서브 두 화면 높이에 걸쳐 내린다)", "count": 1000, "shape": "snow", "colorA": "#F2F6FF", "colorB": "#D8E4F6", "weightB": 0.6, "minSize": 2.5, "maxSize": 5, "opacity": 0.6, "wind": 0.1, "fallSpeed": 0.05, "speedJitter": 0.4, "sway": 10, "swaySpeed": 1.2, "spin": 0, "flutter": 0, "depthBlur": 0, "gust": 0.7, "parallax": 0.5, "top": 0, "bottom": 2.0},
+    {"type": "petals", "seed": 2, "comment": "중간 눈", "count": 400, "shape": "snow", "colorA": "#FFFFFF", "colorB": "#E2ECFA", "weightB": 0.5, "minSize": 5, "maxSize": 10, "opacity": 0.8, "wind": 0.17, "fallSpeed": 0.085, "speedJitter": 0.35, "sway": 22, "swaySpeed": 1.0, "spin": 0, "flutter": 0, "depthBlur": 0.3, "gust": 0.7, "parallax": 0.5, "top": 0, "bottom": 2.0},
+    {"type": "petals", "seed": 7, "comment": "바람에 비스듬히 날리는 눈발(움직이는 방향으로 늘인 눈)", "count": 320, "shape": "snow", "colorA": "#F4F7FF", "colorB": "#DCE6F6", "weightB": 0.5, "minSize": 3, "maxSize": 5, "opacity": 0.45, "wind": 0.3, "fallSpeed": 0.25, "speedJitter": 0.3, "sway": 6, "spin": 0, "flutter": 0, "depthBlur": 0, "gust": 0.7, "parallax": 0.4, "stretch": 5, "top": 0, "bottom": 2.0},
+    {"type": "petals", "seed": 3, "comment": "가까운 큰 눈송이(흐림)", "count": 48, "shape": "snow", "colorA": "#FFFFFF", "minSize": 18, "maxSize": 40, "opacity": 0.5, "wind": 0.28, "fallSpeed": 0.15, "speedJitter": 0.3, "sway": 40, "swaySpeed": 0.8, "spin": 0, "flutter": 0, "depthBlur": 1.0, "gust": 0.7, "parallax": 0.3, "top": 0, "bottom": 2.0},
+    {"type": "vignette", "strength": 0.45, "radius": 0.5, "softness": 0.75}
+  ],
+  "sub": {
+    "mode": "continue",
+    "comment": "메인 아래로 이어지는 가까운 눈 비탈. 가까운 능선·눈 네 겹은 메인과 같은 값이어야 경계에서 이어진다.",
+    "layers": [
+      {"type": "ridge", "seed": 62, "comment": "가까운 능선", "color": "#17233B", "ground": 1.0, "height": 0.14, "roughness": 0.7, "scale": 420, "rim": "#C3D4EC", "rimStrength": 0.12},
+      {"type": "ridge", "seed": 71, "comment": "눈 비탈 - 먼 둔덕(능선은 밝고 아래로 그늘)", "color": "#93A5C4", "ground": 1.66, "height": 0.5, "roughness": 0.45, "scale": 1500, "rim": "#EEF3FB", "rimStrength": 0.5, "shade": 0.35, "shadeDepth": 260},
+      {"type": "petals", "seed": 12, "comment": "비탈 위를 스치는 눈가루(옆으로 길게)", "count": 220, "shape": "snow", "colorA": "#F4F8FF", "colorB": "#DCE6F6", "weightB": 0.5, "minSize": 3, "maxSize": 7, "opacity": 0.45, "wind": 0.45, "fallSpeed": 0.04, "speedJitter": 0.4, "sway": 8, "swaySpeed": 1.5, "spin": 0, "flutter": 0, "depthBlur": 0.4, "gust": 0.8, "parallax": 0.6, "stretch": 9, "top": 1.15, "bottom": 2.05},
+      {"type": "ridge", "seed": 73, "comment": "눈 비탈 - 발밑 눈더미", "color": "#BCC9DF", "ground": 2.15, "height": 0.55, "roughness": 0.35, "scale": 2000, "rim": "#FFFFFF", "rimStrength": 0.45, "shade": 0.3, "shadeDepth": 320},
+      {"type": "petals", "seed": 13, "comment": "발밑을 스치는 눈가루(가깝고 빠름)", "count": 70, "shape": "snow", "colorA": "#FFFFFF", "colorB": "#E6EEFA", "weightB": 0.5, "minSize": 6, "maxSize": 12, "opacity": 0.4, "wind": 0.7, "fallSpeed": 0.03, "speedJitter": 0.4, "sway": 14, "swaySpeed": 1.2, "spin": 0, "flutter": 0, "depthBlur": 0.7, "gust": 0.8, "parallax": 0.6, "stretch": 10, "top": 1.5, "bottom": 2.05},
+      {"type": "petals", "seed": 1, "comment": "먼 눈(메인·서브 두 화면 높이에 걸쳐 내린다)", "count": 1000, "shape": "snow", "colorA": "#F2F6FF", "colorB": "#D8E4F6", "weightB": 0.6, "minSize": 2.5, "maxSize": 5, "opacity": 0.6, "wind": 0.1, "fallSpeed": 0.05, "speedJitter": 0.4, "sway": 10, "swaySpeed": 1.2, "spin": 0, "flutter": 0, "depthBlur": 0, "gust": 0.7, "parallax": 0.5, "top": 0, "bottom": 2.0},
+      {"type": "petals", "seed": 2, "comment": "중간 눈", "count": 400, "shape": "snow", "colorA": "#FFFFFF", "colorB": "#E2ECFA", "weightB": 0.5, "minSize": 5, "maxSize": 10, "opacity": 0.8, "wind": 0.17, "fallSpeed": 0.085, "speedJitter": 0.35, "sway": 22, "swaySpeed": 1.0, "spin": 0, "flutter": 0, "depthBlur": 0.3, "gust": 0.7, "parallax": 0.5, "top": 0, "bottom": 2.0},
+      {"type": "petals", "seed": 7, "comment": "바람에 비스듬히 날리는 눈발(움직이는 방향으로 늘인 눈)", "count": 320, "shape": "snow", "colorA": "#F4F7FF", "colorB": "#DCE6F6", "weightB": 0.5, "minSize": 3, "maxSize": 5, "opacity": 0.45, "wind": 0.3, "fallSpeed": 0.25, "speedJitter": 0.3, "sway": 6, "spin": 0, "flutter": 0, "depthBlur": 0, "gust": 0.7, "parallax": 0.4, "stretch": 5, "top": 0, "bottom": 2.0},
+      {"type": "petals", "seed": 3, "comment": "가까운 큰 눈송이(흐림)", "count": 48, "shape": "snow", "colorA": "#FFFFFF", "minSize": 18, "maxSize": 40, "opacity": 0.5, "wind": 0.28, "fallSpeed": 0.15, "speedJitter": 0.3, "sway": 40, "swaySpeed": 0.8, "spin": 0, "flutter": 0, "depthBlur": 1.0, "gust": 0.7, "parallax": 0.3, "top": 0, "bottom": 2.0},
+      {"type": "vignette", "strength": 0.45, "radius": 0.5, "softness": 0.75}
+    ]
+  }
+}

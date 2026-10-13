@@ -1,0 +1,25 @@
+{
+  "name": "새벽 유성우",
+  "description": "동트기 직전 남보라빛 하늘에 별똥별이 쏟아지고 주황빛 지평선 아래 산 능선과 안개가 깔리며, 서브 화면에는 그 하늘과 산이 잔잔한 새벽 호수에 비친다.",
+  "layers": [
+    {"type": "gradient", "top": "#050820", "bottom": "#3E2250", "glow": "#FF7A36", "glowStrength": 0.85, "glowCenter": 0.8, "glowWidth": 0.13},
+    {"type": "gradient", "blend": "add", "comment": "중간 높이 보라빛", "top": "#000000", "bottom": "#000000", "glow": "#3A1E5C", "glowStrength": 0.45, "glowCenter": 0.62, "glowWidth": 0.25},
+    {"type": "gradient", "blend": "add", "comment": "지평선 바로 위 따뜻한 띠", "top": "#000000", "bottom": "#000000", "glow": "#FF9A3C", "glowStrength": 0.32, "glowCenter": 0.8, "glowWidth": 0.06},
+    {"type": "particles", "seed": 11, "count": 520, "shape": "glow", "colorA": "#FFFFFF", "colorB": "#C8D6FF", "weightB": 0.6, "colorC": "#FFE2C4", "weightC": 0.25, "minSize": 1.8, "maxSize": 4, "opacity": 0.65, "twinkle": 0.6, "top": 0, "bottom": 0.62},
+    {"type": "particles", "seed": 12, "count": 36, "shape": "glow", "colorA": "#FFFFFF", "colorB": "#D6E2FF", "weightB": 0.5, "minSize": 5, "maxSize": 9, "opacity": 0.75, "twinkle": 0.4, "top": 0, "bottom": 0.45},
+    {"type": "meteor", "seed": 3, "color": "#EAF3FF", "brightness": 1.0, "interval": 4, "length": 300, "duration": 0.85, "width": 1.6, "top": 0.02, "bottom": 0.32, "angle": 38, "travel": 760},
+    {"type": "meteor", "seed": 8, "color": "#FFE7D0", "brightness": 0.8, "interval": 5.5, "length": 220, "duration": 0.7, "width": 1.3, "top": 0.05, "bottom": 0.4, "angle": 30, "travel": 560},
+    {"type": "ridge", "seed": 21, "color": "#4A2A4C", "ground": 1.0, "height": 0.27, "roughness": 0.6, "scale": 1300, "rim": "#FFB07A", "rimStrength": 0.25},
+    {"type": "fog", "seed": 4, "color": "#C9787A", "opacity": 0.18, "scale": 1.4, "flowX": 0.008, "bottomBias": 0.95},
+    {"type": "ridge", "seed": 22, "color": "#2C1A36", "ground": 1.0, "height": 0.21, "roughness": 0.7, "scale": 820, "rim": "#FF9A6A", "rimStrength": 0.12},
+    {"type": "fog", "seed": 6, "color": "#6E4466", "opacity": 0.2, "scale": 2.0, "flowX": -0.006, "bottomBias": 1.0},
+    {"type": "ridge", "seed": 23, "color": "#0C0812", "ground": 1.0, "height": 0.12, "roughness": 0.8, "scale": 520},
+    {"type": "vignette", "strength": 0.4, "radius": 0.5, "softness": 0.75}
+  ],
+  "sub": {
+    "mode": "mirror",
+    "add": [
+      {"type": "water", "tint": "#C8B8D8", "reflectivity": 0.82, "ripple": 5, "wavelength": 26, "speed": 0.4, "blur": 1.0, "sparkle": 0.2, "horizon": 0, "fade": 0.4}
+    ]
+  }
+}

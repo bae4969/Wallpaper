@@ -1,0 +1,9 @@
+{
+  "name": "컬러 유체",
+  "description": "짙은 남색 바탕에 자홍·주황·청록 잉크가 천천히 휘감기며 흐르고, 서브 화면에는 같은 유체가 경계 없이 아래로 이어져 흐른다.",
+  "layers": [
+    {"type": "fluid", "seed": 1, "colorA": "#081440", "colorB": "#9E2A6E", "colorC": "#13848A", "colorD": "#F28A45", "scale": 1.0, "speed": 0.2, "warp": 3.6, "gloss": 0.22, "brightness": 1.0},
+    {"type": "vignette", "strength": 0.45, "radius": 0.5, "softness": 0.7}
+  ],
+  "sub": {"mode": "continue"}
+}

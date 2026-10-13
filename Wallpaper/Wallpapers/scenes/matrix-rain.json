@@ -1,0 +1,11 @@
+{
+  "name": "매트릭스",
+  "description": "검은 화면에 초록 코드 비가 멀고 가까운 두 겹으로 쏟아지고, 서브 화면에는 그 줄기가 메인에서 끊기지 않고 그대로 이어져 떨어진다.",
+  "layers": [
+    {"type": "gradient", "top": "#000201", "bottom": "#010603", "glow": "#00230C", "glowStrength": 0.25, "glowCenter": 0.5, "glowWidth": 0.6},
+    {"type": "matrix", "seed": 1, "comment": "먼 층", "color": "#1FA64A", "brightness": 0.32, "headColor": "#9CF5B0", "headBrightness": 0.55, "size": 15, "speed": 8, "trail": 24, "density": 0.75, "glow": 0.35, "fall": 2},
+    {"type": "matrix", "seed": 2, "comment": "가까운 층", "color": "#38F06A", "brightness": 0.85, "headColor": "#E4FFE8", "headBrightness": 1.0, "size": 27, "speed": 12, "trail": 18, "density": 0.55, "glow": 0.7, "fall": 2},
+    {"type": "vignette", "strength": 0.6, "radius": 0.45, "softness": 0.7}
+  ],
+  "sub": {"mode": "continue"}
+}

@@ -1,0 +1,9 @@
+{
+  "name": "지형도",
+  "description": "어두운 청회색 바탕 위로 은은한 색의 등고선이 천천히 모양을 바꾸고, 서브 화면에는 같은 지형이 아래로 이어져 한 장의 큰 지도처럼 펼쳐진다.",
+  "layers": [
+    {"type": "contour", "seed": 1, "background": "#151B22", "fill": 0.35, "lineColor": "#4F9DB8", "lineColorHigh": "#D49A6A", "tint": 1.0, "opacity": 0.62, "lines": 26, "thickness": 1.1, "majorEvery": 5, "majorWidth": 2.2, "scale": 620, "speed": 0.02, "edgeFade": 0.3},
+    {"type": "vignette", "strength": 0.45, "radius": 0.5, "softness": 0.7}
+  ],
+  "sub": {"mode": "continue"}
+}

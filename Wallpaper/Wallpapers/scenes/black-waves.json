@@ -1,0 +1,10 @@
+{
+  "name": "검은 파도",
+  "description": "거의 검은 바탕 위로 은빛 가는 선들이 깊이감 있게 물결치고, 서브 화면에는 같은 물결면이 발치까지 다가와 선 간격이 넓어지며 이어진다.",
+  "layers": [
+    {"type": "gradient", "top": "#030406", "bottom": "#0A0C11", "glow": "#1A2230", "glowStrength": 0.35, "glowCenter": 0.65, "glowWidth": 0.3},
+    {"type": "linewaves", "seed": 1, "colorA": "#F2F4F8", "colorB": "#9DB0CC", "colorBMix": 0.7, "opacity": 0.9, "lines": 110, "thickness": 0.9, "amplitude": 0.12, "wavelength": 0.45, "speed": 0.2, "angle": -3, "perspective": 0.85, "depthFade": 0.8, "shading": 1.0, "center": 0.55},
+    {"type": "vignette", "strength": 0.55, "radius": 0.45, "softness": 0.75}
+  ],
+  "sub": {"mode": "continue"}
+}

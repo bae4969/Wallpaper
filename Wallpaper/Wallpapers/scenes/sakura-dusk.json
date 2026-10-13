@@ -1,0 +1,36 @@
+{
+  "name": "벚꽃 노을",
+  "description": "분홍·보랏빛 노을 아래 겹겹의 언덕 위로 벚꽃잎이 흩날리고 화면 위로 흐릿한 벚꽃 가지가 드리운다 — 서브 모니터에는 꽃잎이 계속 떨어져 내려 쌓이는 가까운 언덕 풀밭이 보인다.",
+  "layers": [
+    {"type": "gradient", "top": "#2A1C4C", "bottom": "#F6B086", "glow": "#FF9AA8", "glowStrength": 0.45, "glowCenter": 0.76, "glowWidth": 0.2},
+    {"type": "gradient", "blend": "add", "comment": "중간 높이 보랏빛", "top": "#000000", "bottom": "#000000", "glow": "#5A2C6E", "glowStrength": 0.4, "glowCenter": 0.45, "glowWidth": 0.28},
+    {"type": "particles", "seed": 1, "count": 160, "shape": "glow", "colorA": "#FFFFFF", "colorB": "#FFE0EC", "weightB": 0.6, "minSize": 1.6, "maxSize": 3.5, "opacity": 0.55, "twinkle": 0.6, "top": 0.12, "bottom": 0.45},
+    {"type": "lightrays", "seed": 1, "comment": "산 너머로 퍼지는 노을 빛살", "color": "#FFB59A", "intensity": 0.16, "originX": 0.33, "originY": 0.8, "direction": 180, "spread": 55, "rayCount": 9, "sharpness": 2.2, "speed": 0.03, "length": 0.9, "glow": 0.35, "glowSize": 260, "dust": 0.2, "bottomFade": 0},
+    {"type": "ridge", "seed": 31, "comment": "먼 산", "color": "#B07A9E", "ground": 1.0, "height": 0.27, "roughness": 0.55, "scale": 1300, "rim": "#FFC8CC", "rimStrength": 0.2},
+    {"type": "fog", "seed": 3, "color": "#F4A9B4", "opacity": 0.3, "scale": 1.3, "flowX": 0.007, "bottomBias": 0.9},
+    {"type": "ridge", "seed": 32, "comment": "중간 언덕", "color": "#74487E", "ground": 1.0, "height": 0.17, "roughness": 0.5, "scale": 900, "rim": "#FFA8BE", "rimStrength": 0.18},
+    {"type": "ridge", "seed": 33, "comment": "가까운 언덕", "color": "#3A2149", "ground": 1.0, "height": 0.09, "roughness": 0.5, "scale": 700, "rim": "#FF9AB4", "rimStrength": 0.12},
+    {"type": "petals", "seed": 1, "comment": "먼 꽃잎(메인·서브 두 화면 높이에 걸쳐 내린다)", "count": 260, "shape": "petal", "colorA": "#FF9FC0", "colorB": "#FFC2D5", "weightB": 0.7, "colorC": "#EE7FA8", "weightC": 0.5, "minSize": 8, "maxSize": 14, "opacity": 0.8, "wind": 0.035, "fallSpeed": 0.025, "speedJitter": 0.4, "sway": 18, "swaySpeed": 0.9, "spin": 1.0, "flutter": 2.0, "depthBlur": 0, "gust": 0.5, "parallax": 0.3, "top": 0, "bottom": 2.0},
+    {"type": "particles", "seed": 4, "count": 70, "shape": "glow", "blend": "alpha", "comment": "위쪽 흐린 벚꽃 가지(초점 밖 꽃 덩어리)", "colorA": "#FF9CC0", "colorB": "#FFC4D8", "weightB": 0.7, "colorC": "#D9709E", "weightC": 0.6, "minSize": 160, "maxSize": 420, "opacity": 0.85, "velocityX": 0.0015, "velocityY": 0.0, "speedJitter": 0.5, "twinkle": 0.15, "top": -0.14, "bottom": 0.09},
+    {"type": "particles", "seed": 5, "count": 30, "shape": "bokeh", "blend": "add", "comment": "꽃 사이로 새는 빛망울", "colorA": "#FFD9E6", "colorB": "#FFC2A8", "weightB": 0.6, "minSize": 16, "maxSize": 40, "opacity": 0.07, "velocityX": 0.002, "velocityY": 0.0, "speedJitter": 0.5, "twinkle": 0.6, "top": -0.02, "bottom": 0.12},
+    {"type": "petals", "seed": 2, "comment": "중간 꽃잎", "count": 160, "shape": "petal", "colorA": "#FFA6C4", "colorB": "#FFCADB", "weightB": 0.8, "colorC": "#F283AD", "weightC": 0.6, "minSize": 20, "maxSize": 40, "opacity": 0.95, "wind": 0.05, "fallSpeed": 0.035, "speedJitter": 0.35, "sway": 40, "swaySpeed": 0.8, "spin": 0.9, "flutter": 1.7, "depthBlur": 0.25, "gust": 0.5, "parallax": 0.5, "top": 0, "bottom": 2.0},
+    {"type": "petals", "seed": 3, "comment": "가까운 큰 꽃잎(흐림)", "count": 18, "shape": "petal", "colorA": "#FFB0CA", "colorB": "#FFD0DF", "weightB": 0.6, "minSize": 55, "maxSize": 90, "opacity": 0.85, "wind": 0.08, "fallSpeed": 0.055, "speedJitter": 0.3, "sway": 70, "swaySpeed": 0.6, "spin": 0.7, "flutter": 1.3, "depthBlur": 1.0, "gust": 0.5, "parallax": 0.3, "top": 0, "bottom": 2.0},
+    {"type": "vignette", "strength": 0.4, "radius": 0.5, "softness": 0.75}
+  ],
+  "sub": {
+    "mode": "continue",
+    "comment": "메인 아래로 이어지는 가까운 언덕. 가까운 언덕·꽃잎 세 겹은 메인과 같은 값이어야 경계에서 이어진다.",
+    "layers": [
+      {"type": "ridge", "seed": 33, "comment": "가까운 언덕", "color": "#3A2149", "ground": 1.0, "height": 0.09, "roughness": 0.5, "scale": 700, "rim": "#FF9AB4", "rimStrength": 0.12},
+      {"type": "grass", "seed": 6, "comment": "언덕 비탈의 먼 풀", "color": "#4A2A5E", "tip": "#7E4C80", "tipMix": 0.6, "far": "#4E2C62", "farMix": 1, "base": 1.08, "bladeHeight": 110, "density": 18, "bladeWidth": 5, "wind": 0.3, "windSpeed": 0.6, "gustSize": 500, "rowGap": 0.06, "rows": 3, "lightSide": -1, "baseShade": 1},
+      {"type": "grass", "seed": 7, "comment": "가까운 풀밭(노을빛 받은 풀끝)", "color": "#3E2352", "tip": "#A2648C", "tipMix": 0.65, "far": "#46285A", "farMix": 1, "base": 1.3, "bladeHeight": 300, "density": 9, "bladeWidth": 10, "wind": 0.32, "windSpeed": 0.6, "gustSize": 500, "rowGap": 0.1, "rows": 3, "variation": 0.35, "lightSide": -1, "baseShade": 1},
+      {"type": "grass", "seed": 8, "comment": "발밑 풀", "color": "#38204A", "tip": "#AA6890", "tipMix": 0.7, "base": 1.72, "bladeHeight": 420, "density": 5, "bladeWidth": 16, "wind": 0.34, "windSpeed": 0.6, "gustSize": 500, "rows": 1, "variation": 0.35, "lightSide": -1, "baseShade": 1},
+      {"type": "grass", "seed": 9, "comment": "발밑 풀(더 가까이)", "color": "#321C44", "tip": "#AA6890", "tipMix": 0.7, "base": 2.0, "bladeHeight": 540, "density": 3.5, "bladeWidth": 22, "wind": 0.36, "windSpeed": 0.6, "gustSize": 500, "rows": 1, "variation": 0.35, "lightSide": -1, "baseShade": 1},
+      {"type": "petals", "seed": 21, "comment": "풀밭에 내려앉은 꽃잎(움직이지 않음)", "count": 140, "shape": "petal", "colorA": "#E48AAE", "colorB": "#F0A6C2", "weightB": 0.7, "colorC": "#C9729A", "weightC": 0.5, "minSize": 10, "maxSize": 26, "opacity": 0.8, "wind": 0, "fallSpeed": 0, "speedJitter": 0, "sway": 0, "spin": 0, "flutter": 0, "depthBlur": 0, "gust": 0, "parallax": 0, "top": 1.62, "bottom": 2.05},
+      {"type": "petals", "seed": 1, "comment": "먼 꽃잎(메인·서브 두 화면 높이에 걸쳐 내린다)", "count": 260, "shape": "petal", "colorA": "#FF9FC0", "colorB": "#FFC2D5", "weightB": 0.7, "colorC": "#EE7FA8", "weightC": 0.5, "minSize": 8, "maxSize": 14, "opacity": 0.8, "wind": 0.035, "fallSpeed": 0.025, "speedJitter": 0.4, "sway": 18, "swaySpeed": 0.9, "spin": 1.0, "flutter": 2.0, "depthBlur": 0, "gust": 0.5, "parallax": 0.3, "top": 0, "bottom": 2.0},
+      {"type": "petals", "seed": 2, "comment": "중간 꽃잎", "count": 160, "shape": "petal", "colorA": "#FFA6C4", "colorB": "#FFCADB", "weightB": 0.8, "colorC": "#F283AD", "weightC": 0.6, "minSize": 20, "maxSize": 40, "opacity": 0.95, "wind": 0.05, "fallSpeed": 0.035, "speedJitter": 0.35, "sway": 40, "swaySpeed": 0.8, "spin": 0.9, "flutter": 1.7, "depthBlur": 0.25, "gust": 0.5, "parallax": 0.5, "top": 0, "bottom": 2.0},
+      {"type": "petals", "seed": 3, "comment": "가까운 큰 꽃잎(흐림)", "count": 18, "shape": "petal", "colorA": "#FFB0CA", "colorB": "#FFD0DF", "weightB": 0.6, "minSize": 55, "maxSize": 90, "opacity": 0.85, "wind": 0.08, "fallSpeed": 0.055, "speedJitter": 0.3, "sway": 70, "swaySpeed": 0.6, "spin": 0.7, "flutter": 1.3, "depthBlur": 1.0, "gust": 0.5, "parallax": 0.3, "top": 0, "bottom": 2.0},
+      {"type": "vignette", "strength": 0.4, "radius": 0.5, "softness": 0.75}
+    ]
+  }
+}

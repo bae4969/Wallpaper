@@ -1,0 +1,19 @@
+{
+  "name": "노을 바다",
+  "description": "수평선에 걸린 해와 분홍빛 구름 아래 햇빛 길이 반짝이는 저녁 바다 — 서브 모니터에는 발밑까지 다가온 물결과 이어지는 햇빛 반짝임이 보인다.",
+  "layers": [
+    {"type": "gradient", "top": "#2A2558", "bottom": "#F2A070", "glow": "#FFB070", "glowStrength": 0.45, "glowCenter": 0.62, "glowWidth": 0.16},
+    {"type": "sun", "x": 0.68, "y": 0.575, "size": 34, "haloSize": 55, "color": "#FFE6A8", "haloColor": "#FFB45C", "glow": 0.7, "wideColor": "#FF8A4C", "wideGlow": 0.35, "rays": 0, "horizon": 0.62},
+    {"type": "clouds", "seed": 3, "light": "#FFA98C", "shadow": "#7A5A8E", "rim": "#FFD49A", "rimStrength": 0.6, "coverage": 0.36, "stretch": 1.8, "scale": 560, "speed": 0.006, "top": 0.0, "bottom": 0.58, "softness": 0.1, "perspective": 0.7, "lightX": 0.3, "lightY": -1, "shading": 0.4, "fade": 0.2, "opacity": 0.95},
+    {"type": "ocean", "horizon": 0.62, "deep": "#15152E", "shallow": "#4A3A66", "shallowMix": 0.5, "sky": "#7A5A8A", "reflection": 0.5, "sunColor": "#FFB060", "sunStrength": 2.0, "sunX": 0.68, "sunY": 0.575, "waveScale": 1, "speed": 0.5, "choppiness": 0.8, "glitter": 0.8, "haze": "#FFBE96", "hazeWidth": 0.02, "windAngle": 15, "near": 1},
+    {"type": "vignette", "strength": 0.35, "radius": 0.55, "softness": 0.7}
+  ],
+  "sub": {
+    "mode": "continue",
+    "comment": "메인 아래로 이어지는 가까운 바다. 하늘 레이어는 바다에 가려지므로 바다만 다시 그린다(값은 메인과 같게 두어야 경계가 이어진다).",
+    "layers": [
+      {"type": "ocean", "horizon": 0.62, "deep": "#15152E", "shallow": "#4A3A66", "shallowMix": 0.5, "sky": "#7A5A8A", "reflection": 0.5, "sunColor": "#FFB060", "sunStrength": 2.0, "sunX": 0.68, "sunY": 0.575, "waveScale": 1, "speed": 0.5, "choppiness": 0.8, "glitter": 0.8, "haze": "#FFBE96", "hazeWidth": 0.02, "windAngle": 15, "near": 1},
+      {"type": "vignette", "strength": 0.3, "radius": 0.55, "softness": 0.7}
+    ]
+  }
+}

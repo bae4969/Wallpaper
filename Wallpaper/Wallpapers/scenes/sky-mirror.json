@@ -1,0 +1,16 @@
+{
+  "name": "하늘 거울",
+  "description": "뭉게구름 가득한 맑은 오후 하늘이 지평선까지 펼쳐지고, 서브 화면에는 그 하늘이 우유니 소금사막처럼 얕은 물 위에 거울같이 비친다.",
+  "layers": [
+    {"type": "gradient", "top": "#2F6CC8", "bottom": "#D4E2EE", "glow": "#FFE2B8", "glowStrength": 0.14, "glowCenter": 1.0, "glowWidth": 0.2},
+    {"type": "sun", "x": 0.82, "y": 0.1, "size": 26, "haloSize": 80, "color": "#FFFFF6", "haloColor": "#FFF0C8", "glow": 0.45, "wideColor": "#FFF4DC", "wideGlow": 0.25, "rays": 0},
+    {"type": "clouds", "seed": 4, "light": "#FFFFFF", "shadow": "#9AAAC6", "rim": "#FFF4DE", "rimStrength": 0.35, "coverage": 0.52, "scale": 620, "speed": 0.006, "top": 0.0, "bottom": 1.0, "softness": 0.055, "perspective": 0.85, "stretch": 1.1, "lightX": 0.5, "lightY": 1, "shading": 0.5, "fade": 0.06},
+    {"type": "ridge", "seed": 8, "color": "#8C9CB4", "ground": 1.0, "height": 0.022, "roughness": 0.6, "scale": 700}
+  ],
+  "sub": {
+    "mode": "mirror",
+    "add": [
+      {"type": "water", "tint": "#EEF3F8", "reflectivity": 0.96, "ripple": 1.2, "wavelength": 40, "speed": 0.25, "blur": 0.2, "sparkle": 0.04, "horizon": 0, "fade": 0.08}
+    ]
+  }
+}
