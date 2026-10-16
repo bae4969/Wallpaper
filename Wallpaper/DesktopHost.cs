@@ -132,6 +132,16 @@ namespace Wallpaper
             get { return Native.IsWindow(surface.Handle) && Native.IsWindow(host) && Native.GetParent(surface.Handle) == host; }
         }
 
+        // 화면 구성이 바뀐 직후 바탕화면 창이 늦게 옮겨지면 자식 창인 위젯이 엉뚱한 곳에 남는다. 실제 창 위치가 놓은 자리와 다른지 본다.
+        public bool IsMisplaced
+        {
+            get
+            {
+                Native.Rect rect;
+                return !Bounds.IsEmpty && Native.GetWindowRect(surface.Handle, out rect) && (rect.Left != Bounds.Left || rect.Top != Bounds.Top);
+            }
+        }
+
         public void Show() { renderer.Show(); }
 
         public void SetVisible(bool enabled)
@@ -501,6 +511,8 @@ namespace Wallpaper
         [StructLayout(LayoutKind.Sequential)]
         internal struct Point { public int X; public int Y; }
         [StructLayout(LayoutKind.Sequential)]
+        internal struct Rect { public int Left, Top, Right, Bottom; }
+        [StructLayout(LayoutKind.Sequential)]
         internal struct BitmapInfo
         {
             public uint HeaderSize;
@@ -534,6 +546,8 @@ namespace Wallpaper
         internal static extern int SetWindowLong(IntPtr window, int index, int value);
         [DllImport("user32.dll")]
         internal static extern bool ScreenToClient(IntPtr window, ref Point point);
+        [DllImport("user32.dll")]
+        internal static extern bool GetWindowRect(IntPtr window, out Rect rect);
         [DllImport("user32.dll", SetLastError = true)]
         internal static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
         [DllImport("user32.dll", SetLastError = true)]

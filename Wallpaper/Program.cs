@@ -55,8 +55,16 @@ namespace Wallpaper
 
     internal sealed class ClockApplication : Application, ISettingsHost
     {
-        // 연결된 모니터마다 위젯 묶음 하나. 키는 장치 이름.
+        // 연결된 모니터마다 배경과 그 화면에 놓인 위젯 창. 키는 장치 이름. 위젯 목록 자체는 모든 화면 공용(preferences.Widgets).
         private readonly Dictionary<string, MonitorRuntime> monitors = new Dictionary<string, MonitorRuntime>();
+        // 하드웨어 수집은 위젯마다 하나(그 위젯을 놓은 모든 화면이 함께 쓴다)와 마지막 값
+        private readonly Dictionary<string, HardwareFeed> feeds = new Dictionary<string, HardwareFeed>();
+        private readonly Dictionary<string, HardwareSnapshot> snapshots = new Dictionary<string, HardwareSnapshot>();
+        // 마지막으로 맞춘 화면 구성(Monitors.Describe)
+        private string topology;
+        private bool misplacedLogged;
+        // 화면을 맞추다 설정이 바뀌었으면(예전 장치 이름 → 모니터 키, 새 위젯 자리) 저장한다.
+        private bool dirty;
         private readonly Dictionary<string, Action<System.Windows.Media.Imaging.BitmapSource>> previewHandlers = new Dictionary<string, Action<System.Windows.Media.Imaging.BitmapSource>>();
         private TaskbarIcon tray;
         private ContextMenu menu;
@@ -86,7 +94,7 @@ namespace Wallpaper
         {
             base.OnStartup(e);
             preferences = UserPreferences.Load();
-            bool firstRun = preferences.Displays.Count == 0;
+            bool firstRun = !preferences.FromFile;
             try { SceneLibrary.EnsureDefaults(); }
             catch (Exception error) { SceneLibrary.LogError("기본 장면을 풀지 못했습니다: " + error.Message); }
             calendarDate = DateTime.Now.Date;
@@ -111,7 +119,19 @@ namespace Wallpaper
             // 효율 모드(EcoQoS)를 켜면 시계 애니메이션·움직이는 배경이 느려지므로 끈다.
             CreateTrayIcon(1);
 
-            SyncMonitors(firstRun);
+            if (firstRun)
+            {
+                // 첫 실행: 주 화면에 시계·달력을 놓는다.
+                var primary = Monitors.All().FirstOrDefault(s => s.Primary);
+                if (primary != null)
+                    foreach (var kind in new[] { "clock", "calendar" })
+                    {
+                        var widget = WidgetSettings.Create(kind);
+                        widget.Monitors.Add(new MonitorPlacement { Monitor = Monitors.Key(primary.DeviceName), Device = primary.DeviceName });
+                        preferences.Widgets.Add(widget);
+                    }
+            }
+            SyncMonitors();
             if (firstRun)
             {
                 SavePreferences();
@@ -175,10 +195,18 @@ namespace Wallpaper
             get { return monitors.Values.OrderByDescending(m => m.Screen.Primary).ThenBy(m => m.Screen.DeviceName); }
         }
 
+        private IEnumerable<WidgetRuntime> Runtimes
+        {
+            get { return monitors.Values.SelectMany(m => m.Items.Values); }
+        }
+
         // 메인 모니터: 설정에서 고른 화면이 연결돼 있으면 그것, 아니면 Windows 주 모니터. 나머지는 서브다.
+        // 예전 설정은 장치 이름으로 저장했으므로 그것도 받는다.
         private Forms.Screen MainScreen(Forms.Screen[] screens)
         {
-            return screens.FirstOrDefault(s => s.DeviceName == preferences.MainDisplay) ?? screens.FirstOrDefault(s => s.Primary) ?? screens.FirstOrDefault();
+            var chosen = preferences.MainDisplay;
+            return screens.FirstOrDefault(s => chosen.Length > 0 && (s.DeviceName == chosen || Monitors.Key(s.DeviceName) == chosen))
+                ?? screens.FirstOrDefault(s => s.Primary) ?? screens.FirstOrDefault();
         }
 
         // 화면이 그릴 배경(세트 id · 메인 · 모든 화면의 배치). 달라지면 장면을 다시 만든다.
@@ -188,15 +216,27 @@ namespace Wallpaper
             return preferences.Scene + "|" + screen.DeviceName + "|" + main.DeviceName + "|" + String.Join(";", screens.Select(s => s.Bounds.ToString()));
         }
 
-        // 연결된 화면마다 위젯 묶음을 만들고, 끊긴 화면·배경이 바뀐 화면은 없앤다.
-        private void SyncMonitors(bool firstRun = false)
+        // 연결된 화면마다 배경을 만들고, 끊긴 화면·배경이 바뀐 화면은 없앤다. 위젯은 공용 목록에서 그 화면에 놓인 것만 만든다.
+        private void SyncMonitors()
         {
-            var screens = Forms.Screen.AllScreens;
+            var screens = Monitors.All();
             var main = MainScreen(screens);
+            var described = Monitors.Describe(screens);
+            if (described != topology)
+            {
+                SceneLibrary.LogError("화면 구성: " + described);
+                topology = described;
+                misplacedLogged = false;
+            }
+            if (main != null && preferences.MainDisplay == main.DeviceName)
+            {
+                preferences.MainDisplay = Monitors.Key(main.DeviceName);
+                dirty = true;
+            }
             foreach (var monitor in monitors.Values.ToArray())
             {
                 var screen = screens.FirstOrDefault(s => s.DeviceName == monitor.Screen.DeviceName);
-                if (screen == null || preferences.Display(screen.DeviceName) != monitor.Layout ||
+                if (screen == null || Monitors.Key(screen.DeviceName) != monitor.Key ||
                     monitor.SceneKey != SceneKey(screen, main, screens) ||
                     (monitor.Scene != null && (screen.Bounds != monitor.Screen.Bounds || monitor.RenderScale != preferences.RenderScale)))
                 {
@@ -207,75 +247,223 @@ namespace Wallpaper
                 RefreshBackdrop(monitor);
             }
             foreach (var screen in screens)
-            {
-                if (monitors.ContainsKey(screen.DeviceName)) continue;
-                var layout = preferences.Display(screen.DeviceName);
-                if (layout == null)
-                {
-                    // 처음 보는 화면은 위젯 없이 시작한다. 첫 실행이면 주 화면에만 시계·달력을 켠다.
-                    bool start = firstRun && screen.Primary;
-                    layout = new DisplayLayout { Device = screen.DeviceName, ClockEnabled = start, CalendarEnabled = start };
-                    preferences.Displays.Add(layout);
-                }
-                CreateMonitor(screen, layout, main, screens);
-            }
+                if (!monitors.ContainsKey(screen.DeviceName)) CreateMonitor(screen, main, screens);
+            SyncWidgets();
         }
 
-        private void CreateMonitor(Forms.Screen screen, DisplayLayout layout, Forms.Screen main, Forms.Screen[] screens)
+        private void CreateMonitor(Forms.Screen screen, Forms.Screen main, Forms.Screen[] screens)
         {
-            var monitor = new MonitorRuntime { Screen = screen, Layout = layout, Backdrop = WallpaperBackdrop.Load(screen), SceneKey = SceneKey(screen, main, screens) };
+            var monitor = new MonitorRuntime { Screen = screen, Key = Monitors.Key(screen.DeviceName), Backdrop = WallpaperBackdrop.Load(screen), SceneKey = SceneKey(screen, main, screens) };
             monitors.Add(screen.DeviceName, monitor);
-            if (monitor.SceneKey.Length > 0)
+            if (monitor.SceneKey.Length == 0) return;
+            // 움직이는 배경을 만들 수 없으면 Windows 배경화면으로 표시한다. 옆 모니터는 메인 풍경을 이어서, 아래 등 나머지는
+            // 세트의 서브 구성을 메인과의 위치에 맞춰 그린다.
+            try
             {
-                // 움직이는 배경을 만들 수 없으면 Windows 배경화면으로 표시한다. 옆 모니터는 메인 풍경을 이어서, 아래 등 나머지는
-                // 세트의 서브 구성을 메인과의 위치에 맞춰 그린다.
-                try
-                {
-                    var definition = SceneLibrary.Scene(preferences.Scene);
-                    if (definition == null) throw new FileNotFoundException("장면 파일이 없습니다: scenes\\" + preferences.Scene + ".json");
-                    bool sub; string role;
-                    monitor.View = SceneView.Arrange(definition, main.Bounds, screen.Bounds, screens.Select(s => s.Bounds).ToList(), out sub, out role);
-                    monitor.IsSub = sub;
-                    monitor.Role = role;
-                    monitor.Scene = new WallpaperScene(screen, definition, monitor.IsSub, monitor.View, preferences.FrameLimit, preferences.RenderScale, preferences.EffectQuality);
-                    monitor.SceneDefinition = definition;
-                    monitor.RenderScale = preferences.RenderScale;
-                    monitor.Scene.Paused = userPaused;
-                }
-                catch (Exception error) { ReportSceneError(DisplayName(screen.DeviceName), error); }
+                var definition = SceneLibrary.Scene(preferences.Scene);
+                if (definition == null) throw new FileNotFoundException("장면 파일이 없습니다: scenes\\" + preferences.Scene + ".json");
+                bool sub; string role;
+                monitor.View = SceneView.Arrange(definition, main.Bounds, screen.Bounds, screens.Select(s => s.Bounds).ToList(), out sub, out role);
+                monitor.IsSub = sub;
+                monitor.Role = role;
+                monitor.Scene = new WallpaperScene(screen, definition, monitor.IsSub, monitor.View, preferences.FrameLimit, preferences.RenderScale, preferences.EffectQuality);
+                monitor.SceneDefinition = definition;
+                monitor.RenderScale = preferences.RenderScale;
+                monitor.Scene.Paused = userPaused;
             }
-            monitor.ClockView = new FlipClock();
-            monitor.CalendarView = new CalendarView();
-            monitor.Clock = new DesktopWidget("Wallpaper.Clock", monitor.ClockView, monitor.Scene);
-            monitor.Calendar = new DesktopWidget("Wallpaper.Calendar", monitor.CalendarView, monitor.Scene);
-            monitor.Widgets.Add("clock", monitor.Clock); monitor.Widgets.Add("calendar", monitor.Calendar);
-            foreach (var entry in monitor.Widgets)
-            {
-                entry.Value.Show();
-                entry.Value.SetVisible(layout.IsEnabled(entry.Key));
-            }
-            var now = DateTime.Now;
-            BuiltInWidgetOptions.Apply(monitor.ClockView, layout.ClockOptions);
-            BuiltInWidgetOptions.ApplyShadow(monitor.Clock, layout.ClockOptions);
-            BuiltInWidgetOptions.ApplyShadow(monitor.Calendar, layout.CalendarOptions);
-            monitor.ClockView.UpdateTime(now, false);
-            monitor.CalendarView.UpdateDate(now);
-            BuiltInWidgetOptions.Apply(monitor.CalendarView, layout.CalendarOptions);
-            PlaceWidgets(monitor);
-            foreach (var settings in layout.Hardware) CreateHardware(monitor, settings);
-            foreach (var settings in layout.Scripts) CreateScript(monitor, settings);
+            catch (Exception error) { ReportSceneError(DisplayName(screen.DeviceName), error); }
         }
 
+        // 화면을 없앤다. 하드웨어 수집은 그대로 두고, 뒤따르는 SyncMonitors → SyncWidgets 가 정리한다.
         private void DestroyMonitor(MonitorRuntime monitor)
         {
             if (editing == monitor && editorWindow != null) editorWindow.Close();
-            foreach (var id in monitor.Hardware.Keys.ToArray()) DestroyHardware(monitor, id);
-            foreach (var id in monitor.Scripts.Keys.ToArray()) DestroyScript(monitor, id);
-            foreach (var widget in monitor.Widgets.Values) widget.Dispose();
-            monitor.Widgets.Clear();
+            foreach (var id in monitor.Items.Keys.ToArray()) DestroyWidget(monitor, id);
             monitor.Backdrop.Dispose();
             if (monitor.Scene != null) monitor.Scene.Dispose();
             monitors.Remove(monitor.Screen.DeviceName);
+        }
+
+        // ---- 위젯: 공용 목록(preferences.Widgets) ↔ 화면마다 만든 창 ----
+
+        // 위젯이 이 화면에 놓인 자리. 예전 설정에서 옮긴 자리(장치 이름)는 처음 맞을 때 모니터 키로 바꾼다.
+        private MonitorPlacement Spot(WidgetSettings widget, MonitorRuntime monitor)
+        {
+            var spot = widget.Monitors.FirstOrDefault(p => p.Monitor == monitor.Key)
+                ?? widget.Monitors.FirstOrDefault(p => p.Monitor == monitor.Screen.DeviceName);
+            if (spot != null && (spot.Monitor != monitor.Key || spot.Device != monitor.Screen.DeviceName))
+            {
+                spot.Monitor = monitor.Key;
+                spot.Device = monitor.Screen.DeviceName;
+                dirty = true;
+            }
+            return spot;
+        }
+
+        // 화면마다 켜진 자리가 있는 위젯은 만들고, 목록에서 빠졌거나 꺼진 위젯은 없앤다. 하드웨어 수집도 맞춘다.
+        private void SyncWidgets()
+        {
+            foreach (var monitor in monitors.Values)
+            {
+                foreach (var id in monitor.Items.Keys.ToArray())
+                {
+                    var widget = preferences.Widget(id);
+                    var spot = widget == null ? null : Spot(widget, monitor);
+                    if (spot == null || !spot.Enabled) DestroyWidget(monitor, id);
+                }
+                foreach (var widget in preferences.Widgets.ToArray())
+                {
+                    if (monitor.Items.ContainsKey(widget.Id) || monitor.Failed.Contains(widget.Id)) continue;
+                    var spot = Spot(widget, monitor);
+                    if (spot != null && spot.Enabled) CreateWidget(monitor, widget, spot);
+                }
+            }
+            UpdateFeeds();
+            if (dirty)
+            {
+                dirty = false;
+                SavePreferences();
+            }
+        }
+
+        private void CreateWidget(MonitorRuntime monitor, WidgetSettings widget, MonitorPlacement spot)
+        {
+            var runtime = new WidgetRuntime { Settings = widget, Spot = spot };
+            var now = DateTime.Now;
+            FrameworkElement view;
+            if (widget.Kind == "clock")
+            {
+                runtime.Clock = new FlipClock();
+                BuiltInWidgetOptions.Apply(runtime.Clock, widget.Options);
+                runtime.Clock.UpdateTime(now, false);
+                view = runtime.Clock;
+            }
+            else if (widget.Kind == "calendar")
+            {
+                runtime.Calendar = new CalendarView();
+                runtime.Calendar.UpdateDate(now);
+                BuiltInWidgetOptions.Apply(runtime.Calendar, widget.Options);
+                view = runtime.Calendar;
+            }
+            else if (widget.Kind == "hardware")
+            {
+                runtime.Hardware = new HardwareView(widget.Hardware);
+                HardwareSnapshot last;
+                if (snapshots.TryGetValue(widget.Id, out last)) runtime.Hardware.Update(last);
+                view = runtime.Hardware;
+            }
+            else
+            {
+                try
+                {
+                    runtime.Script = WidgetScript.Load(widget.Type);
+                    runtime.Data = new Scripting.WidgetData();
+                    runtime.Data.SetParams(runtime.Script.Parameters, widget.Options);
+                    runtime.Data.Update(now, LocalMetrics.Latest);
+                    view = runtime.Script.Build(runtime.Data);
+                }
+                catch (Exception error)
+                {
+                    monitor.Failed.Add(widget.Id);
+                    ReportError("Wallpaper 위젯 오류", DisplayName(monitor.Screen.DeviceName) + " · " + widget.Type, error);
+                    return;
+                }
+                if (runtime.Script.Metrics) { LocalMetrics.Acquire(); runtime.UsesMetrics = true; }
+            }
+            runtime.Widget = new DesktopWidget("Wallpaper." + widget.Id, view, monitor.Scene);
+            monitor.Items.Add(widget.Id, runtime);
+            monitor.Widgets.Add(widget.Id, runtime.Widget);
+            runtime.Widget.Show();
+            runtime.Widget.SetVisible(true);
+            BuiltInWidgetOptions.ApplyShadow(runtime.Widget, widget.Options);
+            // 하드웨어·스크립트 위젯은 처음 놓일 때 다른 위젯과 겹치지 않는 자리를 찾는다(시계는 가운데, 달력은 좌하단이 기본).
+            if (spot.Placement == null && runtime.Clock == null && runtime.Calendar == null)
+            {
+                spot.Placement = NewPlacement(monitor, runtime.Widget);
+                dirty = true;
+            }
+            PlaceWidget(monitor, runtime);
+            if (editing == monitor) AttachPreview(widget.Id);
+        }
+
+        private void DestroyWidget(MonitorRuntime monitor, string id)
+        {
+            var runtime = monitor.Items[id];
+            monitor.Items.Remove(id);
+            if (runtime.UsesMetrics) LocalMetrics.Release();
+            if (editing == monitor)
+            {
+                if (editorWindow != null) editorWindow.RemoveWidget(id);
+                DetachPreview(id);
+            }
+            monitor.Widgets.Remove(id);
+            runtime.Widget.Dispose();
+        }
+
+        // 하드웨어 수집은 위젯마다 하나: 어느 화면에든 놓여 있으면 돌리고, 아무 데도 없으면 멈춘다.
+        private void UpdateFeeds()
+        {
+            var shown = new HashSet<string>(Runtimes.Where(r => r.Hardware != null).Select(r => r.Settings.Id));
+            foreach (var id in feeds.Keys.ToArray())
+                if (!shown.Contains(id)) StopFeed(id);
+            foreach (var id in shown)
+            {
+                if (feeds.ContainsKey(id)) continue;
+                var feed = new HardwareFeed(preferences.Widget(id).Hardware);
+                feeds.Add(id, feed);
+                var key = id;
+                feed.Updated += snapshot =>
+                {
+                    if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
+                    Dispatcher.BeginInvoke(new Action(() => ShowSnapshot(key, feed, snapshot)));
+                };
+                feed.Start();
+            }
+        }
+
+        private void StopFeed(string id)
+        {
+            HardwareFeed feed;
+            if (!feeds.TryGetValue(id, out feed)) return;
+            feeds.Remove(id);
+            snapshots.Remove(id);
+            feed.Dispose();
+        }
+
+        private void ShowSnapshot(string id, HardwareFeed feed, HardwareSnapshot snapshot)
+        {
+            HardwareFeed current;
+            if (shuttingDown || !feeds.TryGetValue(id, out current) || current != feed) return;
+            snapshots[id] = snapshot;
+            foreach (var monitor in monitors.Values)
+            {
+                WidgetRuntime runtime;
+                if (!monitor.Items.TryGetValue(id, out runtime) || runtime.Hardware == null) continue;
+                bool resized = runtime.Hardware.Update(snapshot);
+                if (resized) PlaceWidget(monitor, runtime);
+                else runtime.Widget.Render();
+                if (resized && editorWindow != null && editing == monitor) editorWindow.SyncWidget(id);
+            }
+        }
+
+        // 목록에 보일 이름. 같은 이름이 여럿이면 뒤에 번호를 붙인다(시계 2).
+        private Dictionary<string, string> WidgetNames()
+        {
+            var types = new Dictionary<string, string>();
+            foreach (var type in WidgetScript.All()) types[type.Id] = type.Name;
+            var names = new Dictionary<string, string>();
+            var counts = new Dictionary<string, int>();
+            foreach (var widget in preferences.Widgets)
+            {
+                string type, name = widget.Kind == "clock" ? "시계" : widget.Kind == "calendar" ? "달력"
+                    : widget.Kind == "hardware" ? widget.Hardware.Name
+                    : types.TryGetValue(widget.Type, out type) ? type : widget.Type + " (오류)";
+                int count;
+                counts.TryGetValue(name, out count);
+                counts[name] = ++count;
+                names[widget.Id] = count > 1 ? name + " " + count : name;
+            }
+            return names;
         }
 
         private MenuItem MenuEntry(string header, Action action)
@@ -325,8 +513,9 @@ namespace Wallpaper
 
         void ISettingsHost.ChangeMainDisplay(string device)
         {
-            if (preferences.MainDisplay == device) return;
-            preferences.MainDisplay = device;
+            MonitorRuntime monitor;
+            if (!monitors.TryGetValue(device, out monitor) || preferences.MainDisplay == monitor.Key) return;
+            preferences.MainDisplay = monitor.Key;
             preferences.Save();
             SyncMonitors();
         }
@@ -336,48 +525,66 @@ namespace Wallpaper
             Dispatcher.BeginInvoke(new Action(() => OpenEditor(device)));
         }
 
-        IEnumerable<SettingsWindow.WidgetEntry> ISettingsHost.Widgets(string device)
+        // 공용 위젯 목록: 위젯마다 연결된 화면(놓였는지)과, 연결이 끊겼지만 놓여 있는 화면
+        IEnumerable<SettingsWindow.WidgetEntry> ISettingsHost.Widgets()
         {
-            MonitorRuntime monitor;
-            return monitors.TryGetValue(device, out monitor) ? WidgetEntries(monitor) : Enumerable.Empty<SettingsWindow.WidgetEntry>();
+            var names = WidgetNames();
+            var main = MainScreen(Monitors.All());
+            var entries = new List<SettingsWindow.WidgetEntry>();
+            foreach (var widget in preferences.Widgets)
+            {
+                var entry = new SettingsWindow.WidgetEntry { Id = widget.Id, Name = names[widget.Id], Kind = widget.Kind };
+                foreach (var monitor in OrderedMonitors)
+                {
+                    var spot = widget.Monitors.FirstOrDefault(p => p.Monitor == monitor.Key || p.Monitor == monitor.Screen.DeviceName);
+                    entry.Monitors.Add(new SettingsWindow.WidgetMonitor
+                    {
+                        Key = monitor.Key, Connected = true, Shown = spot != null && spot.Enabled,
+                        Name = DisplayName(monitor.Screen.DeviceName) + (main != null && main.DeviceName == monitor.Screen.DeviceName ? " (메인)" : "")
+                    });
+                }
+                foreach (var spot in widget.Monitors.Where(p => p.Enabled && !monitors.Values.Any(m => p.Monitor == m.Key || p.Monitor == m.Screen.DeviceName)))
+                    entry.Monitors.Add(new SettingsWindow.WidgetMonitor { Key = spot.Monitor, Name = DisplayName(spot.Device) + " (연결 안 됨)", Shown = true });
+                entries.Add(entry);
+            }
+            return entries;
         }
 
-        // 화면의 위젯 목록(설정 창 목록·편집 창 켜고 끄기 메뉴): 시계·달력 → 하드웨어 → 스크립트 순
-        private IEnumerable<SettingsWindow.WidgetEntry> WidgetEntries(MonitorRuntime monitor)
+        void ISettingsHost.ShowWidget(string id, string monitor, bool shown) { ShowWidget(id, monitor, shown); }
+
+        void ISettingsHost.EditWidget(string id)
         {
-            var layout = monitor.Layout;
-            yield return new SettingsWindow.WidgetEntry { Id = "clock", Name = "시계", Kind = "builtin", Enabled = layout.ClockEnabled };
-            yield return new SettingsWindow.WidgetEntry { Id = "calendar", Name = "달력", Kind = "builtin", Enabled = layout.CalendarEnabled };
-            foreach (var hardware in layout.Hardware.ToArray())
-                yield return new SettingsWindow.WidgetEntry { Id = hardware.Id, Name = hardware.Name, Kind = "hardware", Enabled = hardware.Enabled };
-            foreach (var script in layout.Scripts.ToArray())
-                yield return new SettingsWindow.WidgetEntry { Id = script.Id, Name = ScriptName(monitor, script), Kind = "script", Enabled = script.Enabled };
+            var widget = preferences.Widget(id);
+            if (widget == null) return;
+            if (widget.Kind == "hardware") EditHardware(id);
+            else EditOptions(widget);
         }
 
-        void ISettingsHost.EditWidgetOptions(string device, string id)
+        // 새 위젯은 메인 모니터에 놓는다. 하드웨어 상태는 먼저 연결 설정 창을 연다.
+        void ISettingsHost.AddWidget(string kind, string type)
         {
-            MonitorRuntime monitor;
-            if (monitors.TryGetValue(device, out monitor)) EditOptions(monitor, id);
+            if (kind == "hardware") { EditHardware(null); return; }
+            if (kind == "script")
+            {
+                try { WidgetScript.Load(type); }
+                catch (Exception error)
+                {
+                    MessageBox.Show("위젯을 읽지 못했습니다.\n" + error.Message, "Wallpaper");
+                    return;
+                }
+            }
+            var widget = WidgetSettings.Create(kind);
+            widget.Type = type ?? "";
+            AddToList(widget);
         }
 
-        void ISettingsHost.EditHardware(string device, string id)
+        void ISettingsHost.RemoveWidget(string id)
         {
-            MonitorRuntime monitor;
-            if (monitors.TryGetValue(device, out monitor)) EditHardware(monitor, id);
-        }
-
-        void ISettingsHost.AddScript(string device, string type)
-        {
-            MonitorRuntime monitor;
-            if (monitors.TryGetValue(device, out monitor)) AddScript(monitor, type);
-        }
-
-        void ISettingsHost.RemoveWidget(string device, string id)
-        {
-            MonitorRuntime monitor;
-            if (!monitors.TryGetValue(device, out monitor)) return;
-            if (monitor.Layout.Hardware.Any(w => w.Id == id)) RemoveHardware(monitor, id);
-            else RemoveScript(monitor, id);
+            var widget = preferences.Widget(id);
+            if (widget == null) return;
+            preferences.Widgets.Remove(widget);
+            SavePreferences();
+            SyncWidgets();
         }
 
         IList<string> ISettingsHost.SceneUsers(string scene)
@@ -394,13 +601,45 @@ namespace Wallpaper
             SceneLibrary.DeleteScene(scene);
         }
 
+        private void AddToList(WidgetSettings widget)
+        {
+            var main = MainScreen(Monitors.All());
+            MonitorRuntime monitor;
+            if (main != null && monitors.TryGetValue(main.DeviceName, out monitor))
+                widget.Monitors.Add(new MonitorPlacement { Monitor = monitor.Key, Device = main.DeviceName });
+            preferences.Widgets.Add(widget);
+            SavePreferences();
+            SyncWidgets();
+        }
+
+        // 위젯을 화면에 놓거나 뺀다. 뺀 자리는 지우지 않아 다시 놓으면 마지막 자리로 돌아간다.
+        private void ShowWidget(string id, string key, bool shown)
+        {
+            var widget = preferences.Widget(id);
+            if (widget == null) return;
+            var monitor = monitors.Values.FirstOrDefault(m => m.Key == key);
+            var spot = monitor != null ? Spot(widget, monitor) : widget.Monitors.FirstOrDefault(p => p.Monitor == key);
+            if (spot == null)
+            {
+                if (!shown) return;
+                spot = new MonitorPlacement { Monitor = key, Device = monitor != null ? monitor.Screen.DeviceName : "" };
+                widget.Monitors.Add(spot);
+            }
+            if (spot.Enabled == shown && (monitor == null || monitor.Items.ContainsKey(id) == shown)) return;
+            spot.Enabled = shown;
+            foreach (var each in monitors.Values) each.Failed.Remove(id);
+            SavePreferences();
+            SyncWidgets();
+            if (monitor != null && editorWindow != null && editing == monitor) editorWindow.RefreshWidget(id);
+        }
+
         // 위젯 대화 상자의 주인: 편집 창이 열려 있으면 그것, 아니면 설정 창
         private Window DialogOwner { get { return (Window)editorWindow ?? settingsWindow; } }
 
-        // 설정 창의 디스플레이 목록: 이름·해상도·배경·켜진 위젯 수
+        // 설정 창의 디스플레이 목록: 이름·해상도·배경·놓인 위젯 수
         private IEnumerable<SettingsWindow.DisplayEntry> DisplayEntries()
         {
-            var main = MainScreen(Forms.Screen.AllScreens);
+            var main = MainScreen(Monitors.All());
             foreach (var monitor in OrderedMonitors)
             {
                 string background = "Windows 배경화면";
@@ -420,7 +659,7 @@ namespace Wallpaper
                     Device = monitor.Screen.DeviceName, Name = DisplayName(monitor.Screen.DeviceName), Primary = monitor.Screen.Primary,
                     Main = main != null && monitor.Screen.DeviceName == main.DeviceName, Role = monitor.Role,
                     X = monitor.Screen.Bounds.X, Y = monitor.Screen.Bounds.Y, Width = monitor.Screen.Bounds.Width, Height = monitor.Screen.Bounds.Height, Background = background,
-                    Widgets = monitor.Widgets.Keys.Count(monitor.Layout.IsEnabled)
+                    Widgets = monitor.Widgets.Count
                 };
             }
         }
@@ -458,11 +697,11 @@ namespace Wallpaper
             SyncMonitors();
         }
 
-        // Wallpapers 폴더가 바뀌면 움직이는 배경을 쓰는 화면을 다시 만든다(장면 작성 중 바로 확인).
+        // Wallpapers 폴더가 바뀌면 움직이는 배경·스크립트 위젯을 쓰는 화면을 다시 만든다(장면 작성 중 바로 확인).
         private void ReloadScenes()
         {
             if (shuttingDown) return;
-            Func<MonitorRuntime, bool> scripted = m => m.SceneKey.Length > 0 || m.Layout.Scripts.Count > 0;
+            Func<MonitorRuntime, bool> scripted = m => m.SceneKey.Length > 0 || m.Failed.Count > 0 || m.Items.Values.Any(r => r.Script != null);
             var reopen = editing != null && scripted(editing) ? editing.Screen.DeviceName : null;
             foreach (var monitor in monitors.Values.Where(scripted).ToArray()) DestroyMonitor(monitor);
             SyncMonitors();
@@ -470,6 +709,7 @@ namespace Wallpaper
             if (reopen != null && editorWindow == null) OpenEditor(reopen);
         }
 
+        // 화면 하나의 레이아웃 편집. 위젯 ▾ 메뉴에는 공용 목록 전체가 나오고, 체크하면 그 위젯을 이 화면에 놓는다.
         private void OpenEditor(string device)
         {
             MonitorRuntime monitor;
@@ -479,9 +719,9 @@ namespace Wallpaper
                 if (editing == monitor) { editorWindow.Activate(); return; }
                 editorWindow.Close();
             }
-            var window = new LayoutEditorWindow(monitor.Screen, EditorBackground(monitor), monitor.Widgets, monitor.Layout.IsEnabled,
-                () => WidgetEntries(monitor).Select(entry => new KeyValuePair<string, string>(entry.Id, entry.Name)).ToArray(),
-                (id, enabled) => SetWidgetEnabled(monitor, id, enabled), (id, placement) => ApplyLayout(monitor, id, placement));
+            var window = new LayoutEditorWindow(monitor.Screen, EditorBackground(monitor), monitor.Widgets, monitor.Widgets.ContainsKey,
+                () => WidgetNames().ToArray(),
+                (id, enabled) => ShowWidget(id, monitor.Key, enabled), (id, placement) => ApplyLayout(monitor, id, placement));
             window.Title = "Wallpaper · " + DisplayName(device) + " 편집";
             editorWindow = window;
             editing = monitor;
@@ -540,45 +780,43 @@ namespace Wallpaper
             previewHandlers.Remove(id);
         }
 
-        private void EditHardware(MonitorRuntime monitor, string id)
+        // 하드웨어 상태 설정 창. id 가 null 이면 새 위젯(메인 모니터에 놓는다). 바꾸면 수집과 모든 화면의 위젯을 새로 만든다.
+        private void EditHardware(string id)
         {
-            var layout = monitor.Layout;
-            var previous = id == null ? null : layout.Hardware.First(w => w.Id == id);
-            var options = previous ?? new HardwareWidgetSettings
-            {
-                Placement = NewHardwarePlacement(monitor)
-            };
-            var dialog = new HardwareSettingsWindow(options) { Owner = DialogOwner };
+            var widget = id == null ? null : preferences.Widget(id);
+            var dialog = new HardwareSettingsWindow(widget != null ? widget.Hardware : new HardwareWidgetSettings()) { Owner = DialogOwner };
             if (dialog.ShowDialog() != true) return;
-            int index = previous == null ? layout.Hardware.Count : layout.Hardware.IndexOf(previous);
-            if (previous == null) layout.Hardware.Add(dialog.Result);
-            else layout.Hardware[index] = dialog.Result;
+            if (widget == null)
+            {
+                widget = WidgetSettings.Create("hardware");
+                widget.Hardware = dialog.Result;
+                AddToList(widget);
+                return;
+            }
+            var previous = widget.Hardware;
+            widget.Hardware = dialog.Result;
             try { preferences.Save(); }
             catch (Exception error)
             {
-                if (previous == null) layout.Hardware.Remove(dialog.Result); else layout.Hardware[index] = previous;
+                widget.Hardware = previous;
                 MessageBox.Show("위젯 설정을 저장하지 못했습니다.\n" + error.Message, "하드웨어 위젯"); return;
             }
-            if (previous != null) DestroyHardware(monitor, id);
-            CreateHardware(monitor, dialog.Result);
-            if (editorWindow != null && editing == monitor) editorWindow.RefreshWidget(dialog.Result.Id);
+            StopFeed(id);
+            foreach (var monitor in monitors.Values.Where(m => m.Items.ContainsKey(id))) DestroyWidget(monitor, id);
+            SyncWidgets();
+            if (editorWindow != null) editorWindow.RefreshWidget(id);
         }
 
-        private WidgetPlacement NewHardwarePlacement(MonitorRuntime monitor)
-        {
-            return NewPlacement(monitor, 224, 312);
-        }
-
-        // 기존 위젯과 겹치지 않는 첫 자리(내용 크기 width×height, DIP 단위)
-        private WidgetPlacement NewPlacement(MonitorRuntime monitor, double contentWidth, double contentHeight)
+        // 기존 위젯과 겹치지 않는 첫 자리
+        private WidgetPlacement NewPlacement(MonitorRuntime monitor, DesktopWidget widget)
         {
             var screen = monitor.Screen.Bounds;
-            double dpi = monitor.Clock.DpiScale;
-            int width = (int)Math.Round(contentWidth * dpi), height = (int)Math.Round(contentHeight * dpi);
+            double dpi = widget.DpiScale;
+            int width = (int)Math.Round(widget.BaseContentPixelWidth), height = (int)Math.Round(widget.BaseContentPixelHeight);
             int gap = (int)Math.Round(16 * dpi), step = Math.Max(1, (int)Math.Round(32 * dpi));
-            var occupied = monitor.Widgets.Where(w => monitor.Layout.IsEnabled(w.Key)).Select(w =>
+            var occupied = monitor.Widgets.Values.Where(w => w != widget).Select(w =>
             {
-                var bounds = w.Value.ContentBounds; bounds.Inflate(gap, gap); return bounds;
+                var bounds = w.ContentBounds; bounds.Inflate(gap, gap); return bounds;
             }).ToArray();
             for (int y = (int)Math.Round(90 * dpi); y + height <= screen.Height - gap; y += step)
                 for (int x = (int)Math.Round(24 * dpi); x + width <= screen.Width - gap; x += step)
@@ -590,214 +828,77 @@ namespace Wallpaper
             return new WidgetPlacement { X = 0.08, Y = 0.12, Scale = 1, ContentAnchored = true };
         }
 
-        private void RemoveHardware(MonitorRuntime monitor, string id)
+        // 위젯 설정 창(시계·달력·스크립트 위젯). 설정 값은 모든 화면이 함께 쓴다. 바꾸면 바로 반영하고 닫을 때 저장한다.
+        private void EditOptions(WidgetSettings widget)
         {
-            var layout = monitor.Layout;
-            var settings = layout.Hardware.First(w => w.Id == id);
-            int index = layout.Hardware.IndexOf(settings);
-            layout.Hardware.Remove(settings);
-            try { preferences.Save(); }
-            catch (Exception error)
+            // 위젯 고유 값 + 공통(배경 진하기·그라데이션 범위)
+            var own = BuiltInWidgetOptions.For(widget.Kind);
+            if (own == null && widget.Kind == "script")
             {
-                layout.Hardware.Insert(index, settings);
-                MessageBox.Show("위젯 제거를 저장하지 못했습니다.\n" + error.Message, "하드웨어 위젯"); return;
-            }
-            DestroyHardware(monitor, id);
-        }
-
-        private void DestroyHardware(MonitorRuntime monitor, string id)
-        {
-            var runtime = monitor.Hardware[id];
-            monitor.Hardware.Remove(id);
-            if (runtime.Feed != null) runtime.Feed.Dispose();
-            if (editing == monitor)
-            {
-                if (editorWindow != null) editorWindow.RemoveWidget(id);
-                DetachPreview(id);
-            }
-            monitor.Widgets.Remove(id);
-            runtime.Widget.Dispose();
-        }
-
-        private void CreateHardware(MonitorRuntime monitor, HardwareWidgetSettings settings)
-        {
-            var runtime = new HardwareRuntime { Settings = settings, View = new HardwareView(settings) };
-            runtime.Widget = new DesktopWidget(settings.Id == "gpu" ? "Wallpaper.GPU" : "Wallpaper." + settings.Id, runtime.View, monitor.Scene);
-            monitor.Hardware.Add(settings.Id, runtime); monitor.Widgets.Add(settings.Id, runtime.Widget);
-            runtime.Widget.Show(); runtime.Widget.SetVisible(settings.Enabled);
-            BuiltInWidgetOptions.ApplyShadow(runtime.Widget, settings.Options);
-            PlaceWidget(monitor, runtime.Widget, settings.Placement, settings.Id);
-            if (editing == monitor) AttachPreview(settings.Id);
-            if (!settings.Enabled) return;
-            runtime.Feed = new HardwareFeed(settings);
-            runtime.Feed.Updated += snapshot =>
-            {
-                if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
-                Dispatcher.BeginInvoke(new Action(delegate
+                try { own = WidgetScript.Load(widget.Type).Parameters.ToArray(); }
+                catch (Exception error)
                 {
-                    HardwareRuntime current;
-                    if (shuttingDown || !monitor.Hardware.TryGetValue(settings.Id, out current) || current != runtime) return;
-                    bool resized = runtime.View.Update(snapshot);
-                    if (resized) PlaceWidget(monitor, runtime.Widget, runtime.Settings.Placement, settings.Id);
-                    else runtime.Widget.Render();
-                    if (resized && editorWindow != null && editing == monitor) editorWindow.SyncWidget(settings.Id);
-                }));
-            };
-            runtime.Feed.Start();
-        }
-
-        // ---- 스크립트 위젯 (Wallpapers\widgets) ----
-
-        private string ScriptName(MonitorRuntime monitor, ScriptWidgetSettings settings)
-        {
-            ScriptRuntime runtime;
-            return monitor.Scripts.TryGetValue(settings.Id, out runtime) ? runtime.Definition.Name : settings.Type + " (오류)";
-        }
-
-        private void CreateScript(MonitorRuntime monitor, ScriptWidgetSettings settings)
-        {
-            var data = new Scripting.WidgetData();
-            WidgetScript definition;
-            System.Windows.Controls.Border view;
-            try
-            {
-                definition = WidgetScript.Load(settings.Type);
-                data.SetParams(definition.Parameters, settings.Options);
-                data.Update(DateTime.Now, LocalMetrics.Latest);
-                view = definition.Build(data);
+                    MessageBox.Show("위젯을 읽지 못했습니다.\n" + error.Message, "Wallpaper");
+                    return;
+                }
             }
-            catch (Exception error)
-            {
-                ReportError("Wallpaper 위젯 오류", DisplayName(monitor.Screen.DeviceName) + " · " + settings.Type, error);
-                return;
-            }
-            var runtime = new ScriptRuntime { Settings = settings, Definition = definition, Data = data, Widget = new DesktopWidget("Wallpaper." + settings.Id, view, monitor.Scene) };
-            if (definition.Metrics) { LocalMetrics.Acquire(); runtime.UsesMetrics = true; }
-            monitor.Scripts.Add(settings.Id, runtime);
-            monitor.Widgets.Add(settings.Id, runtime.Widget);
-            runtime.Widget.Show();
-            runtime.Widget.SetVisible(settings.Enabled);
-            BuiltInWidgetOptions.ApplyShadow(runtime.Widget, settings.Options);
-            PlaceWidget(monitor, runtime.Widget, settings.Placement, settings.Id);
-            if (editing == monitor) AttachPreview(settings.Id);
-        }
-
-        private void DestroyScript(MonitorRuntime monitor, string id)
-        {
-            var runtime = monitor.Scripts[id];
-            monitor.Scripts.Remove(id);
-            if (runtime.UsesMetrics) LocalMetrics.Release();
-            if (editing == monitor)
-            {
-                if (editorWindow != null) editorWindow.RemoveWidget(id);
-                DetachPreview(id);
-            }
-            monitor.Widgets.Remove(id);
-            runtime.Widget.Dispose();
-        }
-
-        private void AddScript(MonitorRuntime monitor, string type)
-        {
-            WidgetScript definition;
-            try { definition = WidgetScript.Load(type); }
-            catch (Exception error)
-            {
-                MessageBox.Show("위젯을 읽지 못했습니다.\n" + error.Message, "Wallpaper");
-                return;
-            }
-            var settings = new ScriptWidgetSettings { Type = type, Placement = NewPlacement(monitor, definition.Width, definition.Height) };
-            monitor.Layout.Scripts.Add(settings);
-            SavePreferences();
-            CreateScript(monitor, settings);
-            if (editorWindow != null && editing == monitor) editorWindow.RefreshWidget(settings.Id);
-        }
-
-        private void RemoveScript(MonitorRuntime monitor, string id)
-        {
-            monitor.Layout.Scripts.RemoveAll(script => script.Id == id);
-            SavePreferences();
-            if (monitor.Scripts.ContainsKey(id)) DestroyScript(monitor, id);
-        }
-
-        // 위젯 설정 창(시계·달력·스크립트 위젯). 바꾸면 바로 반영하고 닫을 때 저장한다.
-        private void EditOptions(MonitorRuntime monitor, string id)
-        {
-            ScriptRuntime runtime;
-            monitor.Scripts.TryGetValue(id, out runtime);
-            var values = monitor.Layout.Options(id);
-            if (values == null || !monitor.Widgets.ContainsKey(id)) return;
-            // 위젯 고유 값 + 공통(배경 진하기·그라데이션 범위). 하드웨어 위젯은 공통 값만(연결은 자기 설정 창).
-            var own = BuiltInWidgetOptions.For(id) ?? (runtime != null ? runtime.Definition.Parameters.ToArray() : new WidgetParameter[0]);
-            var parameters = own.Concat(BuiltInWidgetOptions.Common).ToArray();
-            var hardware = monitor.Layout.Hardware.FirstOrDefault(w => w.Id == id);
-            string title = id == "clock" ? "시계" : id == "calendar" ? "달력" : runtime != null ? runtime.Definition.Name : hardware != null ? hardware.Name : id;
-            var window = new WidgetOptionsWindow(title, parameters, values, () => ApplyOptions(monitor, id)) { Owner = DialogOwner };
+            var parameters = (own ?? new WidgetParameter[0]).Concat(BuiltInWidgetOptions.Common).ToArray();
+            var window = new WidgetOptionsWindow(WidgetNames()[widget.Id], parameters, widget.Options, () => ApplyOptions(widget)) { Owner = DialogOwner };
             window.ShowDialog();
             SavePreferences();
         }
 
-        private void ApplyOptions(MonitorRuntime monitor, string id)
+        private void ApplyOptions(WidgetSettings widget)
         {
-            var layout = monitor.Layout;
-            if (id == "clock")
+            foreach (var monitor in monitors.Values)
             {
-                BuiltInWidgetOptions.Apply(monitor.ClockView, layout.ClockOptions);
-                PlaceWidget(monitor, monitor.Clock, layout.Clock, id);
-            }
-            else if (id == "calendar")
-            {
-                BuiltInWidgetOptions.Apply(monitor.CalendarView, layout.CalendarOptions);
-                PlaceWidget(monitor, monitor.Calendar, layout.Calendar, id);
-            }
-            else
-            {
-                ScriptRuntime runtime;
-                if (monitor.Scripts.TryGetValue(id, out runtime))
+                WidgetRuntime runtime;
+                if (!monitor.Items.TryGetValue(widget.Id, out runtime)) continue;
+                if (runtime.Clock != null) BuiltInWidgetOptions.Apply(runtime.Clock, widget.Options);
+                else if (runtime.Calendar != null) BuiltInWidgetOptions.Apply(runtime.Calendar, widget.Options);
+                else if (runtime.Script != null)
                 {
-                    runtime.Data.SetParams(runtime.Definition.Parameters, runtime.Settings.Options);
+                    runtime.Data.SetParams(runtime.Script.Parameters, widget.Options);
                     runtime.Widget.Render();
                 }
+                if (runtime.Clock != null || runtime.Calendar != null) PlaceWidget(monitor, runtime);
+                BuiltInWidgetOptions.ApplyShadow(runtime.Widget, widget.Options);
+                if (editorWindow != null && editing == monitor) editorWindow.RefreshWidget(widget.Id);
             }
-            BuiltInWidgetOptions.ApplyShadow(monitor.Widgets[id], layout.Options(id));
-            if (editorWindow != null && editing == monitor && layout.IsEnabled(id)) editorWindow.RefreshWidget(id);
         }
 
         // 위젯마다 정한 간격(interval 초)의 시각 경계에서 다시 그린다(초 단위면 초가 바뀔 때).
         private void RenderScripts(DateTime now)
         {
-            foreach (var monitor in monitors.Values)
-                foreach (var runtime in monitor.Scripts.Values)
-                {
-                    if (!runtime.Settings.Enabled || now < runtime.Next) continue;
-                    long interval = Math.Max(1, (long)(runtime.Definition.Interval * TimeSpan.TicksPerSecond));
-                    runtime.Next = new DateTime((now.Ticks / interval + 1) * interval);
-                    runtime.Data.Update(now, LocalMetrics.Latest);
-                    runtime.Widget.Render();
-                }
+            foreach (var runtime in Runtimes)
+            {
+                if (runtime.Script == null || now < runtime.Next) continue;
+                long interval = Math.Max(1, (long)(runtime.Script.Interval * TimeSpan.TicksPerSecond));
+                runtime.Next = new DateTime((now.Ticks / interval + 1) * interval);
+                runtime.Data.Update(now, LocalMetrics.Latest);
+                runtime.Widget.Render();
+            }
         }
 
-        private sealed class ScriptRuntime
+        // 화면 하나에 놓인 위젯 창. 설정(Settings)·자리(Spot)는 공용 목록의 것을 그대로 가리킨다.
+        private sealed class WidgetRuntime
         {
-            public ScriptWidgetSettings Settings;
-            public WidgetScript Definition;
-            public Scripting.WidgetData Data;
+            public WidgetSettings Settings;
+            public MonitorPlacement Spot;
             public DesktopWidget Widget;
+            public FlipClock Clock;
+            public CalendarView Calendar;
+            public HardwareView Hardware;
+            public WidgetScript Script;
+            public Scripting.WidgetData Data;
             public bool UsesMetrics;
             public DateTime Next;
-        }
-
-        private sealed class HardwareRuntime
-        {
-            public HardwareWidgetSettings Settings;
-            public HardwareView View;
-            public DesktopWidget Widget;
-            public HardwareFeed Feed;
         }
 
         private sealed class MonitorRuntime
         {
             public Forms.Screen Screen;
-            public DisplayLayout Layout;
+            public string Key = "";   // 모니터 키(Monitors.Key)
             public WallpaperBackdrop Backdrop;
             public WallpaperScene Scene;
             public SceneDefinition SceneDefinition;
@@ -806,56 +907,33 @@ namespace Wallpaper
             public string Role = "";
             public SceneView View;
             public double RenderScale = 1;
-            public FlipClock ClockView;
-            public CalendarView CalendarView;
-            public DesktopWidget Clock;
-            public DesktopWidget Calendar;
-            public readonly Dictionary<string, DesktopWidget> Widgets = new Dictionary<string, DesktopWidget>();
-            public readonly Dictionary<string, HardwareRuntime> Hardware = new Dictionary<string, HardwareRuntime>();
-            public readonly Dictionary<string, ScriptRuntime> Scripts = new Dictionary<string, ScriptRuntime>();
+            public readonly Dictionary<string, WidgetRuntime> Items = new Dictionary<string, WidgetRuntime>();
+            public readonly Dictionary<string, DesktopWidget> Widgets = new Dictionary<string, DesktopWidget>();   // 편집 창용(id → 창)
+            public readonly HashSet<string> Failed = new HashSet<string>();   // 만들지 못한 스크립트 위젯(장면 폴더가 바뀌면 다시 시도)
         }
 
-        private void ApplyLayout(MonitorRuntime monitor, string widget, WidgetPlacement placement)
+        private void ApplyLayout(MonitorRuntime monitor, string id, WidgetPlacement placement)
         {
-            monitor.Layout.SetPlacement(widget, placement);
-            PlaceWidget(monitor, monitor.Widgets[widget], placement, widget);
-        }
-
-        // 편집 창의 위젯 켜고 끄기. 바로 저장한다.
-        private void SetWidgetEnabled(MonitorRuntime monitor, string id, bool enabled)
-        {
-            if (!monitor.Widgets.ContainsKey(id) || monitor.Layout.IsEnabled(id) == enabled) return;
-            monitor.Layout.SetEnabled(id, enabled);
-            SavePreferences();
-            var hardware = monitor.Layout.Hardware.FirstOrDefault(w => w.Id == id);
-            if (hardware != null)
-            {
-                // 하드웨어 위젯은 꺼져 있는 동안 수집을 멈추므로 새로 만든다(켜면 수집 시작).
-                DestroyHardware(monitor, id);
-                CreateHardware(monitor, hardware);
-                return;
-            }
-            monitor.Widgets[id].SetVisible(enabled);
-            if (id == "clock")
-            {
-                monitor.ClockView.UpdateTime(DateTime.Now, false);
-                if (enabled && monitor.ClockView.UpdateAnimation()) StartAnimation();
-            }
-            if (enabled) PlaceWidget(monitor, monitor.Widgets[id], monitor.Layout.Placement(id), id);
+            WidgetRuntime runtime;
+            if (!monitor.Items.TryGetValue(id, out runtime)) return;
+            runtime.Spot.Placement = placement;
+            PlaceWidget(monitor, runtime);
         }
 
         private void PlaceWidgets(MonitorRuntime monitor)
         {
-            foreach (var entry in monitor.Widgets) PlaceWidget(monitor, entry.Value, monitor.Layout.Placement(entry.Key), entry.Key);
+            foreach (var runtime in monitor.Items.Values) PlaceWidget(monitor, runtime);
         }
 
-        private void PlaceWidget(MonitorRuntime monitor, DesktopWidget widget, WidgetPlacement placement, string id)
+        private void PlaceWidget(MonitorRuntime monitor, WidgetRuntime runtime)
         {
+            var widget = runtime.Widget;
+            var placement = runtime.Spot.Placement;
+            var kind = runtime.Settings.Kind;
             var screen = monitor.Screen;
             var area = screen.WorkingArea;
             var bounds = screen.Bounds;
-            var dpi = monitor.Clock.DpiScale;
-            var margin = (int)Math.Round(36 * dpi);
+            var margin = (int)Math.Round(36 * widget.DpiScale);
             double scale = placement == null ? 1 : placement.Scale;
             scale = Math.Min(scale, Math.Min(bounds.Width / widget.BaseContentPixelWidth, bounds.Height / widget.BaseContentPixelHeight));
             int width = (int)Math.Round(widget.BasePixelWidth * scale);
@@ -866,11 +944,11 @@ namespace Wallpaper
             int contentWidth = (int)Math.Round(content.Right * widget.DpiScale * scale) - insetX;
             int contentHeight = (int)Math.Round(content.Bottom * widget.DpiScale * scale) - insetY;
             int x = placement != null ? bounds.Left + (int)Math.Round(placement.X * bounds.Width)
-                : id == "clock" ? bounds.Left + (bounds.Width - width) / 2
+                : kind == "clock" ? bounds.Left + (bounds.Width - width) / 2
                 : area.Left + margin;
             int y = placement != null ? bounds.Top + (int)Math.Round(placement.Y * bounds.Height)
-                : id == "clock" ? bounds.Top + (bounds.Height - height) / 2
-                : id == "calendar" ? area.Bottom - margin - height : area.Top + margin;
+                : kind == "clock" ? bounds.Top + (bounds.Height - height) / 2
+                : kind == "calendar" ? area.Bottom - margin - height : area.Top + margin;
             if (placement != null && placement.ContentAnchored) { x -= insetX; y -= insetY; }
             x = Math.Max(bounds.Left - insetX, Math.Min(bounds.Right - contentWidth - insetX, x));
             y = Math.Max(bounds.Top - insetY, Math.Min(bounds.Bottom - contentHeight - insetY, y));
@@ -880,15 +958,15 @@ namespace Wallpaper
         private void Tick(object sender, EventArgs e)
         {
             var now = DateTime.Now;
-            foreach (var monitor in monitors.Values)
-                if (monitor.ClockView.UpdateTime(now, monitor.Layout.ClockEnabled) && monitor.Layout.ClockEnabled) StartAnimation();
+            foreach (var runtime in Runtimes)
+                if (runtime.Clock != null && runtime.Clock.UpdateTime(now, true)) StartAnimation();
             if (now.Date != calendarDate)
             {
                 calendarDate = now.Date;
-                foreach (var monitor in monitors.Values)
+                foreach (var runtime in Runtimes.Where(r => r.Calendar != null))
                 {
-                    monitor.CalendarView.UpdateDate(now);
-                    if (monitor.Layout.CalendarEnabled) monitor.Calendar.Render();
+                    runtime.Calendar.UpdateDate(now);
+                    runtime.Widget.Render();
                 }
             }
             RenderScripts(now);
@@ -896,13 +974,39 @@ namespace Wallpaper
             if (++hostCheck < 60) return;
             hostCheck = 0;
             foreach (var monitor in monitors.Values) if (monitor.Scene != null && monitor.Scene.IsAlive) monitor.Scene.KeepUnderIcons();
+            CheckDesktop();
+        }
+
+        // 2초마다 바탕화면 상태를 확인한다.
+        // ① Explorer 가 다시 시작되면 기존 자식 창도 사라지므로 새 창을 만든다.
+        // ② 화면 구성이 바뀌었는데 알림을 놓쳤으면(원격 데스크톱·잠금 해제 등 세션 전환 중) 다시 맞춘다.
+        // ③ 화면 구성 변경 직후 바탕화면 창이 늦게 옮겨져 위젯·배경 창이 어긋났으면 다시 놓는다.
+        private void CheckDesktop()
+        {
             if (monitors.Values.Any(monitor => monitor.Widgets.Values.Any(widget => !widget.IsDesktopAttached) ||
                 (monitor.Scene != null && !monitor.Scene.IsAlive)))
             {
-                // Explorer가 다시 시작되면 기존 자식 창도 사라지므로 새 창을 만든다.
                 foreach (var monitor in monitors.Values.ToArray()) DestroyMonitor(monitor);
                 SyncMonitors();
+                return;
             }
+            if (Monitors.Describe(Monitors.All()) != topology)
+            {
+                DisplayChanged(this, EventArgs.Empty);
+                return;
+            }
+            var misplaced = monitors.Values.Where(m => (m.Scene != null && m.Scene.IsMisplaced) || m.Widgets.Values.Any(w => w.IsMisplaced)).ToArray();
+            if (misplaced.Length == 0) return;
+            if (!misplacedLogged)
+            {
+                SceneLibrary.LogError("위젯·배경 창이 화면에서 어긋나 다시 놓습니다: " + String.Join(", ", misplaced.Select(m => DisplayName(m.Screen.DeviceName))));
+                misplacedLogged = true;
+            }
+            bool rebuild = false;
+            foreach (var monitor in misplaced)
+                if (monitor.Scene != null && monitor.Scene.IsMisplaced) { DestroyMonitor(monitor); rebuild = true; }
+                else PlaceWidgets(monitor);
+            if (rebuild) SyncMonitors();
         }
 
         private void StartAnimation()
@@ -919,11 +1023,11 @@ namespace Wallpaper
             if (timestamp < nextFrameTimestamp) return;
             nextFrameTimestamp += ((timestamp - nextFrameTimestamp) / FrameTicks + 1) * FrameTicks;
             bool active = false;
-            foreach (var monitor in monitors.Values)
+            foreach (var runtime in Runtimes)
             {
-                if (!monitor.Layout.ClockEnabled) continue;
-                active |= monitor.ClockView.UpdateAnimation();
-                monitor.Clock.Render();
+                if (runtime.Clock == null) continue;
+                active |= runtime.Clock.UpdateAnimation();
+                runtime.Widget.Render();
             }
             if (active) return;
             animationTimer.Stop();
@@ -971,9 +1075,9 @@ namespace Wallpaper
             if (editorWindow != null) editorWindow.Close();
             if (sceneWatcher != null) sceneWatcher.Dispose();
             if (settingsWindow != null) settingsWindow.Close();
+            foreach (var feed in feeds.Values) feed.Dispose();
             foreach (var monitor in monitors.Values)
             {
-                foreach (var runtime in monitor.Hardware.Values) if (runtime.Feed != null) runtime.Feed.Dispose();
                 foreach (var widget in monitor.Widgets.Values) widget.Dispose();
                 monitor.Backdrop.Dispose();
                 if (monitor.Scene != null) monitor.Scene.Dispose();
