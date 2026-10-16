@@ -14,7 +14,10 @@ namespace Wallpaper
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Wallpaper", "preferences.xml");
 
-        public readonly List<DisplayLayout> Displays = new List<DisplayLayout>();
+        // 모든 모니터가 함께 쓰는 위젯 목록. 위젯마다 어느 모니터에 어디에 놓였는지를 가진다(같은 위젯을 여러 모니터에 놓을 수 있다).
+        public readonly List<WidgetSettings> Widgets = new List<WidgetSettings>();
+        // 설정 파일이 있었는지(없으면 첫 실행)
+        public bool FromFile;
         // 움직이는 배경 성능: 프레임 제한(0 = 디스플레이 주사율)과 렌더 해상도 배율(위젯은 항상 원래 해상도)
         public static readonly int[] FrameLimits = { 15, 20, 24, 30, 40, 45, 50, 60, 72, 90, 100, 120, 144, 0 };
         public static readonly double[] RenderScales = { 1, 0.9, 0.8, 0.75, 0.7, 0.6, 0.5, 0.4, 0.33, 0.25 };
@@ -25,7 +28,7 @@ namespace Wallpaper
         public double EffectQuality = 2;
         public bool PauseWhenCovered = true;     // 창이 화면을 덮으면 멈춤
         public bool PauseOnBattery = true;       // 배터리로 작동할 때 멈춤
-        // 배경 세트(장면 id, 빈 값은 Windows 배경화면)와 메인 모니터(빈 값이면 Windows 주 모니터). 나머지 화면은 서브 구성을 쓴다.
+        // 배경 세트(장면 id, 빈 값은 Windows 배경화면)와 메인 모니터(모니터 키, 빈 값이면 Windows 주 모니터). 나머지 화면은 서브 구성을 쓴다.
         public string Scene = "";
         public string MainDisplay = "";
         // 2세트로 합친 예전 서브 전용 장면 → 세트 id
@@ -34,9 +37,9 @@ namespace Wallpaper
             { "aurora-lake", "aurora-sky" }, { "neon-river", "neon-skyline" }, { "sky-mirror-reflection", "sky-mirror" }
         };
 
-        public DisplayLayout Display(string device)
+        public WidgetSettings Widget(string id)
         {
-            return Displays.FirstOrDefault(d => d.Device == device);
+            return Widgets.FirstOrDefault(w => w.Id == id);
         }
 
         public static UserPreferences Load()
@@ -48,6 +51,7 @@ namespace Wallpaper
         {
             var settings = new UserPreferences();
             if (!File.Exists(path)) return settings;
+            settings.FromFile = true;
             try
             {
                 var document = XElement.Load(path);
@@ -70,38 +74,15 @@ namespace Wallpaper
                     settings.Scene = (string)sceneElement.Attribute("id") ?? "";
                     settings.MainDisplay = (string)sceneElement.Attribute("main") ?? "";
                 }
-                var legacyBackgrounds = new List<string>();
-                foreach (var element in document.Elements("display"))
-                {
-                    string device = (string)element.Attribute("device");
-                    if (String.IsNullOrEmpty(device) || settings.Display(device) != null) continue;
-                    var layout = ReadLayout(element);
-                    layout.Device = device;
-                    // 예전 형식의 "이 화면 사용 안 함"은 위젯을 모두 끈 상태로 옮긴다.
-                    if (!ReadEnabled(element, true))
+                var widgets = document.Element("widgets");
+                if (widgets != null)
+                    foreach (var element in widgets.Elements("widget"))
                     {
-                        layout.ClockEnabled = layout.CalendarEnabled = false;
-                        foreach (var widget in layout.Hardware) widget.Enabled = false;
+                        var widget = ReadWidget(element);
+                        if (widget != null && settings.Widget(widget.Id) == null) settings.Widgets.Add(widget);
                     }
-                    legacyBackgrounds.Add((string)element.Attribute("background") ?? "");
-                    settings.Displays.Add(layout);
-                }
-                // 이전 형식: 화면 하나의 장치 이름과 배치를 최상위에 저장했다.
-                string legacy = document.Element("display") != null && document.Element("display").Attribute("device") == null
-                    ? ((string)document.Element("display")).Trim() : "";
-                if (settings.Displays.Count == 0 && legacy.Length > 0)
-                {
-                    var layout = ReadLayout(document);
-                    layout.Device = legacy;
-                    settings.Displays.Add(layout);
-                }
-                // 예전 형식: 화면마다 배경을 따로 골랐다. 처음 고른 장면을 세트로 옮긴다.
-                if (sceneElement == null)
-                {
-                    var first = legacyBackgrounds.FirstOrDefault(b => b.Length > 0) ?? "";
-                    string merged;
-                    settings.Scene = MergedScenes.TryGetValue(first, out merged) ? merged : first;
-                }
+                else
+                    settings.ReadLegacy(document, sceneElement == null);
             }
             catch (XmlException) { }
             catch (IOException) { }
@@ -121,68 +102,162 @@ namespace Wallpaper
                 new XElement("performance", new XAttribute("fps", FrameLimit), new XAttribute("scale", RenderScale.ToString(CultureInfo.InvariantCulture)),
                     new XAttribute("quality", EffectQuality.ToString(CultureInfo.InvariantCulture)), new XAttribute("pauseCovered", PauseWhenCovered), new XAttribute("pauseBattery", PauseOnBattery)),
                 new XElement("scene", new XAttribute("id", Scene), new XAttribute("main", MainDisplay)),
-                Displays.Select(layout =>
-                new XElement("display", new XAttribute("device", layout.Device),
-                    WithOptions(WritePlacement("clock", layout.Clock, layout.ClockEnabled), layout.ClockOptions),
-                    WithOptions(WritePlacement("calendar", layout.Calendar, layout.CalendarEnabled), layout.CalendarOptions),
-                    new XElement("scriptWidgets", layout.Scripts.Select(widget =>
-                    {
-                        var element = WritePlacement("widget", widget.Placement, widget.Enabled);
-                        element.Add(new XAttribute("id", widget.Id), new XAttribute("type", widget.Type));
-                        return WithOptions(element, widget.Options);
-                    })),
-                    new XElement("hardwareWidgets", layout.Hardware.Select(WriteHardware))))).Save(path);
+                new XElement("widgets", Widgets.Select(WriteWidget))).Save(path);
         }
 
-        private static DisplayLayout ReadLayout(XElement parent)
+        // <widget id kind [type] [하드웨어 속성…]><option/>…<monitor key device enabled x y scale anchor/>…</widget>
+        private static WidgetSettings ReadWidget(XElement element)
         {
-            var layout = new DisplayLayout
+            string id = (string)element.Attribute("id"), kind = (string)element.Attribute("kind");
+            if (String.IsNullOrWhiteSpace(id) || !WidgetSettings.Kinds.Contains(kind)) return null;
+            var widget = new WidgetSettings { Id = id, Kind = kind, Type = (string)element.Attribute("type") ?? "" };
+            if (kind == "script" && widget.Type.Length == 0) return null;
+            if (kind == "hardware") widget.Hardware = ReadHardware(element);
+            ReadOptions(element, widget.Options);
+            foreach (var spot in element.Elements("monitor"))
             {
-                Clock = ReadPlacement(parent.Element("clock")), Calendar = ReadPlacement(parent.Element("calendar")),
-                ClockEnabled = ReadEnabled(parent.Element("clock"), true), CalendarEnabled = ReadEnabled(parent.Element("calendar"), true)
+                string key = (string)spot.Attribute("key");
+                if (String.IsNullOrEmpty(key) || widget.Monitors.Any(m => m.Monitor == key)) continue;
+                widget.Monitors.Add(new MonitorPlacement
+                {
+                    Monitor = key, Device = (string)spot.Attribute("device") ?? "",
+                    Enabled = ReadEnabled(spot, true), Placement = ReadPlacement(spot)
+                });
+            }
+            return widget;
+        }
+
+        private static XElement WriteWidget(WidgetSettings widget)
+        {
+            var element = new XElement("widget", new XAttribute("id", widget.Id), new XAttribute("kind", widget.Kind));
+            if (widget.Kind == "script") element.Add(new XAttribute("type", widget.Type));
+            if (widget.Hardware != null) WriteHardware(element, widget.Hardware);
+            WithOptions(element, widget.Options);
+            foreach (var spot in widget.Monitors)
+            {
+                var monitor = new XElement("monitor", new XAttribute("key", spot.Monitor), new XAttribute("device", spot.Device));
+                monitor.Add(WritePlacement("monitor", spot.Placement, spot.Enabled).Attributes());
+                element.Add(monitor);
+            }
+            return element;
+        }
+
+        private static HardwareWidgetSettings ReadHardware(XElement element)
+        {
+            return new HardwareWidgetSettings
+            {
+                Name = (string)element.Attribute("name") ?? "내 PC", Remote = ReadBool(element, "remote", false),
+                Host = (string)element.Attribute("host") ?? "", User = (string)element.Attribute("user") ?? "",
+                KeyFile = (string)element.Attribute("key") ?? "", Port = ReadInt(element, "port", 0, 0, 65535),
+                JumpHost = (string)element.Attribute("jump") ?? "",
+                IntervalSeconds = ReadInt(element, "interval", 2, 1, 60),
+                ShowCpu = ReadBool(element, "cpu", true), ShowMemory = ReadBool(element, "memory", true),
+                ShowGpu = ReadBool(element, "gpu", true), ShowVram = ReadBool(element, "vram", true),
+                ShowNetwork = ReadBool(element, "network", true)
             };
-            ReadOptions(parent.Element("clock"), layout.ClockOptions);
-            ReadOptions(parent.Element("calendar"), layout.CalendarOptions);
-            var scripts = parent.Element("scriptWidgets");
-            if (scripts != null)
-                foreach (var element in scripts.Elements("widget"))
-                {
-                    string id = (string)element.Attribute("id"), type = (string)element.Attribute("type");
-                    if (String.IsNullOrWhiteSpace(id) || String.IsNullOrWhiteSpace(type) || layout.Scripts.Any(w => w.Id == id)) continue;
-                    var widget = new ScriptWidgetSettings { Id = id, Type = type, Enabled = ReadEnabled(element, true), Placement = ReadPlacement(element) };
-                    ReadOptions(element, widget.Options);
-                    layout.Scripts.Add(widget);
-                }
-            var hardware = parent.Element("hardwareWidgets");
-            if (hardware != null)
+        }
+
+        private static void WriteHardware(XElement element, HardwareWidgetSettings widget)
+        {
+            element.Add(new XAttribute("name", widget.Name),
+                new XAttribute("remote", widget.Remote), new XAttribute("host", widget.Host),
+                new XAttribute("user", widget.User), new XAttribute("key", widget.KeyFile),
+                new XAttribute("jump", widget.JumpHost),
+                new XAttribute("port", widget.Port), new XAttribute("interval", widget.IntervalSeconds),
+                new XAttribute("cpu", widget.ShowCpu), new XAttribute("memory", widget.ShowMemory),
+                new XAttribute("gpu", widget.ShowGpu), new XAttribute("vram", widget.ShowVram), new XAttribute("network", widget.ShowNetwork));
+        }
+
+        // ---- 예전 형식: 화면(<display device=…>)마다 위젯을 따로 저장했다 ----
+        // 위젯은 공용 목록으로 옮기고 놓인 화면은 장치 이름으로 기억한다(처음 연결될 때 모니터 키로 바뀐다).
+        // 시계·달력은 설정 값이 같으면 위젯 하나로 합치고, 꺼진 것은 같은 종류가 이미 있을 때만 그 위젯에 자리를 남긴다.
+        private void ReadLegacy(XElement document, bool legacyScene)
+        {
+            var displays = new List<KeyValuePair<string, XElement>>();
+            var legacyBackgrounds = new List<string>();
+            foreach (var element in document.Elements("display"))
             {
-                foreach (var element in hardware.Elements("widget"))
+                string device = (string)element.Attribute("device");
+                if (String.IsNullOrEmpty(device) || displays.Any(d => d.Key == device)) continue;
+                displays.Add(new KeyValuePair<string, XElement>(device, element));
+                legacyBackgrounds.Add((string)element.Attribute("background") ?? "");
+            }
+            // 더 이전 형식: 화면 하나의 장치 이름과 배치를 최상위에 저장했다.
+            string single = document.Element("display") != null && document.Element("display").Attribute("device") == null
+                ? ((string)document.Element("display")).Trim() : "";
+            if (displays.Count == 0 && single.Length > 0) displays.Add(new KeyValuePair<string, XElement>(single, document));
+            // 예전 형식: 화면마다 배경을 따로 골랐다. 처음 고른 장면을 세트로 옮긴다.
+            if (legacyScene)
+            {
+                var first = legacyBackgrounds.FirstOrDefault(b => b.Length > 0) ?? "";
+                string merged;
+                Scene = MergedScenes.TryGetValue(first, out merged) ? merged : first;
+            }
+
+            var builtIns = new List<Tuple<string, XElement, string, bool>>();   // 종류, 요소, 장치, 켜짐
+            foreach (var display in displays)
+            {
+                // 예전 형식의 "이 화면 사용 안 함"은 위젯을 모두 끈 상태로 옮긴다.
+                bool used = ReadEnabled(display.Value, true);
+                foreach (var kind in new[] { "clock", "calendar" })
+                    builtIns.Add(Tuple.Create(kind, display.Value.Element(kind), display.Key, used && ReadEnabled(display.Value.Element(kind), true)));
+            }
+            foreach (var entry in builtIns.OrderBy(e => e.Item4 ? 0 : 1))
+            {
+                var options = new Dictionary<string, string>();
+                ReadOptions(entry.Item2, options);
+                var widget = Widgets.FirstOrDefault(w => w.Kind == entry.Item1 && SameOptions(w.Options, options))
+                    ?? (entry.Item4 ? null : Widgets.FirstOrDefault(w => w.Kind == entry.Item1));
+                if (widget == null)
                 {
-                    string id = (string)element.Attribute("id");
-                    if (String.IsNullOrWhiteSpace(id) || id == "clock" || id == "calendar" || layout.Hardware.Any(w => w.Id == id)) continue;
-                    var widget = new HardwareWidgetSettings
+                    if (!entry.Item4) continue;
+                    widget = WidgetSettings.Create(entry.Item1);
+                    foreach (var option in options) widget.Options[option.Key] = option.Value;
+                    Widgets.Add(widget);
+                }
+                widget.Monitors.Add(new MonitorPlacement { Monitor = entry.Item3, Device = entry.Item3, Enabled = entry.Item4, Placement = ReadPlacement(entry.Item2) });
+            }
+            foreach (var display in displays)
+            {
+                bool used = ReadEnabled(display.Value, true);
+                var scripts = display.Value.Element("scriptWidgets");
+                if (scripts != null)
+                    foreach (var element in scripts.Elements("widget"))
                     {
-                        Id = id, Name = (string)element.Attribute("name") ?? "내 PC",
-                        Enabled = ReadEnabled(element, true), Remote = ReadBool(element, "remote", false),
-                        Host = (string)element.Attribute("host") ?? "", User = (string)element.Attribute("user") ?? "",
-                        KeyFile = (string)element.Attribute("key") ?? "", Port = ReadInt(element, "port", 0, 0, 65535),
-                        JumpHost = (string)element.Attribute("jump") ?? "",
-                        IntervalSeconds = ReadInt(element, "interval", 2, 1, 60),
-                        ShowCpu = ReadBool(element, "cpu", true), ShowMemory = ReadBool(element, "memory", true),
-                        ShowGpu = ReadBool(element, "gpu", true), ShowVram = ReadBool(element, "vram", true),
-                        ShowNetwork = ReadBool(element, "network", true), Placement = ReadPlacement(element)
-                    };
+                        string id = (string)element.Attribute("id"), type = (string)element.Attribute("type");
+                        if (String.IsNullOrWhiteSpace(id) || String.IsNullOrWhiteSpace(type)) continue;
+                        var widget = WidgetSettings.Create("script");
+                        if (Widget(id) == null) widget.Id = id;
+                        widget.Type = type;
+                        ReadOptions(element, widget.Options);
+                        AddLegacy(widget, display.Key, used && ReadEnabled(element, true), ReadPlacement(element));
+                    }
+                var hardware = display.Value.Element("hardwareWidgets");
+                var elements = hardware != null ? hardware.Elements("widget").ToList()
+                    : display.Value.Element("gpu") != null ? new List<XElement> { display.Value.Element("gpu") } : new List<XElement>();
+                foreach (var element in elements)
+                {
+                    string id = hardware != null ? (string)element.Attribute("id") : "gpu";
+                    if (String.IsNullOrWhiteSpace(id) || id == "clock" || id == "calendar") continue;
+                    var widget = WidgetSettings.Create("hardware");
+                    if (Widget(id) == null) widget.Id = id;
+                    widget.Hardware = ReadHardware(element);
+                    if (hardware == null) widget.Hardware.Name = "하드웨어 상태";
                     ReadOptions(element, widget.Options);
-                    layout.Hardware.Add(widget);
+                    AddLegacy(widget, display.Key, used && ReadEnabled(element, hardware != null), ReadPlacement(element));
                 }
             }
-            else if (parent.Element("gpu") != null)
-                layout.Hardware.Add(new HardwareWidgetSettings
-                {
-                    Id = "gpu", Name = "하드웨어 상태", Enabled = ReadEnabled(parent.Element("gpu"), false),
-                    Placement = ReadPlacement(parent.Element("gpu"))
-                });
-            return layout;
+        }
+
+        private void AddLegacy(WidgetSettings widget, string device, bool enabled, WidgetPlacement placement)
+        {
+            widget.Monitors.Add(new MonitorPlacement { Monitor = device, Device = device, Enabled = enabled, Placement = placement });
+            Widgets.Add(widget);
+        }
+
+        private static bool SameOptions(Dictionary<string, string> a, Dictionary<string, string> b)
+        {
+            return a.Count == b.Count && a.All(pair => { string value; return b.TryGetValue(pair.Key, out value) && value == pair.Value; });
         }
 
         // 위젯 설정 값: <option name="..." value="..."/>
@@ -200,19 +275,6 @@ namespace Wallpaper
         {
             foreach (var option in options) element.Add(new XElement("option", new XAttribute("name", option.Key), new XAttribute("value", option.Value)));
             return element;
-        }
-
-        private static XElement WriteHardware(HardwareWidgetSettings widget)
-        {
-            var element = WritePlacement("widget", widget.Placement, widget.Enabled);
-            element.Add(new XAttribute("id", widget.Id), new XAttribute("name", widget.Name),
-                new XAttribute("remote", widget.Remote), new XAttribute("host", widget.Host),
-                new XAttribute("user", widget.User), new XAttribute("key", widget.KeyFile),
-                new XAttribute("jump", widget.JumpHost),
-                new XAttribute("port", widget.Port), new XAttribute("interval", widget.IntervalSeconds),
-                new XAttribute("cpu", widget.ShowCpu), new XAttribute("memory", widget.ShowMemory),
-                new XAttribute("gpu", widget.ShowGpu), new XAttribute("vram", widget.ShowVram), new XAttribute("network", widget.ShowNetwork));
-            return WithOptions(element, widget.Options);
         }
 
         private static bool ReadBool(XElement element, string attribute, bool fallback)
@@ -261,73 +323,34 @@ namespace Wallpaper
         }
     }
 
-    // 모니터 한 대의 위젯 구성. 연결이 끊겨도 보관한다(배경은 UserPreferences.Scene 세트 하나).
-    internal sealed class DisplayLayout
+    // 공용 목록의 위젯 하나: 종류·설정 값과 모니터별 자리. 시계·달력도 다른 위젯처럼 여러 개 둘 수 있다.
+    internal sealed class WidgetSettings
     {
-        public string Device = "";
-        public WidgetPlacement Clock;
-        public WidgetPlacement Calendar;
-        public bool ClockEnabled = true;
-        public bool CalendarEnabled = true;
-        public readonly List<HardwareWidgetSettings> Hardware = new List<HardwareWidgetSettings>();
-        public readonly Dictionary<string, string> ClockOptions = new Dictionary<string, string>();
-        public readonly Dictionary<string, string> CalendarOptions = new Dictionary<string, string>();
-        public readonly List<ScriptWidgetSettings> Scripts = new List<ScriptWidgetSettings>();
+        public static readonly string[] Kinds = { "clock", "calendar", "hardware", "script" };
+        public string Id = "";
+        public string Kind = "";                 // clock | calendar | hardware | script
+        public string Type = "";                 // script: widgets\<Type>
+        public HardwareWidgetSettings Hardware;  // hardware: 연결·표시 항목·이름
+        private readonly Dictionary<string, string> options = new Dictionary<string, string>();
+        // 모니터마다 자리. 꺼도 지우지 않아 다시 켜면 마지막 자리로 돌아간다. 연결이 끊긴 모니터의 자리도 보관한다.
+        public readonly List<MonitorPlacement> Monitors = new List<MonitorPlacement>();
 
-        public bool IsEnabled(string id)
-        {
-            if (id == "clock") return ClockEnabled;
-            if (id == "calendar") return CalendarEnabled;
-            var script = Scripts.FirstOrDefault(w => w.Id == id);
-            if (script != null) return script.Enabled;
-            var widget = Hardware.FirstOrDefault(w => w.Id == id);
-            return widget != null && widget.Enabled;
-        }
+        // 위젯 설정 값(모든 모니터 공통). 하드웨어 위젯은 자기 설정(Hardware.Options)을 쓴다.
+        public Dictionary<string, string> Options { get { return Hardware != null ? Hardware.Options : options; } }
 
-        public void SetEnabled(string id, bool enabled)
+        public static WidgetSettings Create(string kind)
         {
-            if (id == "clock") ClockEnabled = enabled;
-            else if (id == "calendar") CalendarEnabled = enabled;
-            else if (Scripts.Any(w => w.Id == id)) Scripts.First(w => w.Id == id).Enabled = enabled;
-            else Hardware.First(w => w.Id == id).Enabled = enabled;
-        }
-
-        public WidgetPlacement Placement(string id)
-        {
-            if (id == "clock") return Clock;
-            if (id == "calendar") return Calendar;
-            if (Scripts.Any(w => w.Id == id)) return Scripts.First(w => w.Id == id).Placement;
-            return Hardware.First(w => w.Id == id).Placement;
-        }
-
-        public void SetPlacement(string id, WidgetPlacement placement)
-        {
-            if (id == "clock") Clock = placement;
-            else if (id == "calendar") Calendar = placement;
-            else if (Scripts.Any(w => w.Id == id)) Scripts.First(w => w.Id == id).Placement = placement;
-            else Hardware.First(w => w.Id == id).Placement = placement;
-        }
-
-        // 위젯 설정 값(시계·달력·스크립트 위젯). 하드웨어 위젯은 자기 설정 창을 쓴다.
-        public Dictionary<string, string> Options(string id)
-        {
-            if (id == "clock") return ClockOptions;
-            if (id == "calendar") return CalendarOptions;
-            var script = Scripts.FirstOrDefault(w => w.Id == id);
-            if (script != null) return script.Options;
-            var hardware = Hardware.FirstOrDefault(w => w.Id == id);
-            return hardware != null ? hardware.Options : null;
+            return new WidgetSettings { Id = kind + "-" + Guid.NewGuid().ToString("N"), Kind = kind };
         }
     }
 
-    // 스크립트 위젯 인스턴스: 종류(widgets\<Type>) + 배치 + 설정 값
-    internal sealed class ScriptWidgetSettings
+    // 위젯이 모니터 하나에 놓인 자리. Monitor 는 모니터 키(예전 설정에서 옮긴 것은 장치 이름), Device 는 마지막으로 본 장치 이름(표시용).
+    internal sealed class MonitorPlacement
     {
-        public string Id = "script-" + Guid.NewGuid().ToString("N");
-        public string Type = "";
+        public string Monitor = "";
+        public string Device = "";
         public bool Enabled = true;
         public WidgetPlacement Placement;
-        public readonly Dictionary<string, string> Options = new Dictionary<string, string>();
     }
 
     internal sealed class WidgetPlacement

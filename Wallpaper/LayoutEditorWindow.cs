@@ -34,7 +34,7 @@ namespace Wallpaper
 
         // 위치·크기 조절과 위젯 켜고 끄기를 하는 편집 화면. 위젯 추가·제거·설정과 배경은 설정 창에서 한다.
         // background 는 그 화면의 배경 미리보기(움직이는 배경이면 장면의 한 프레임, 아니면 Windows 배경화면).
-        // listWidgets 는 이 화면의 위젯(id, 이름), onToggle 은 켜고 끄기.
+        // listWidgets 는 모든 모니터 공용 위젯 목록(id, 이름), onToggle 은 그 위젯을 이 화면에 놓거나 빼기.
         public LayoutEditorWindow(Forms.Screen screen, ImageSource background,
             Dictionary<string, DesktopWidget> desktopWidgets, Func<string, bool> enabled,
             Func<IEnumerable<KeyValuePair<string, string>>> listWidgets, Action<string, bool> onToggle, Action<string, WidgetPlacement> onChanged)

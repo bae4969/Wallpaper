@@ -92,6 +92,16 @@ namespace Wallpaper
 
         private IntPtr Outer { get { return holder != null ? holder.Handle : surface.Handle; } }
 
+        // 바탕화면 창(Progman)이 화면 구성 변경 뒤 늦게 옮겨지면 배경 창이 모니터에서 어긋난다.
+        public bool IsMisplaced
+        {
+            get
+            {
+                Native.Rect rect;
+                return Native.IsWindow(Outer) && Native.GetWindowRect(Outer, out rect) && (rect.Left != bounds.Left || rect.Top != bounds.Top);
+            }
+        }
+
         // sub 면 장면의 서브 레이어를 그린다. view 는 캔버스(메인 화면)에서 이 화면이 놓인 자리(null 이면 이 화면 자체가 캔버스).
         public WallpaperScene(Forms.Screen screen, SceneDefinition scene, bool sub, SceneView view, int frameLimit, double renderScale, double effectQuality)
         {

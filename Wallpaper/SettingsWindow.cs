@@ -10,7 +10,7 @@ using System.Windows.Media.Imaging;
 
 namespace Wallpaper
 {
-    // 설정 창이 앱에 요청하는 일(디스플레이·배경·위젯·장면·성능). device 는 Windows 장치 이름.
+    // 설정 창이 앱에 요청하는 일(디스플레이·배경·위젯·장면·성능). device 는 Windows 장치 이름, monitor 는 모니터 키.
     internal interface ISettingsHost
     {
         IEnumerable<SettingsWindow.DisplayEntry> Displays();
@@ -19,12 +19,12 @@ namespace Wallpaper
         void ChangeScene(string scene);
         void ChangeMainDisplay(string device);    // 나머지 화면은 서브
         void OpenLayoutEditor(string device);
-        IEnumerable<SettingsWindow.WidgetEntry> Widgets(string device);
+        IEnumerable<SettingsWindow.WidgetEntry> Widgets();   // 모든 모니터 공용 위젯 목록
         IList<WidgetScript> ScriptTypes();
-        void EditWidgetOptions(string device, string id);
-        void EditHardware(string device, string id);   // id 가 null 이면 새 하드웨어 상태 위젯
-        void AddScript(string device, string type);
-        void RemoveWidget(string device, string id);
+        void AddWidget(string kind, string type);  // kind: clock | calendar | hardware(설정 창을 연다) | script. 메인 모니터에 놓는다
+        void EditWidget(string id);
+        void ShowWidget(string id, string monitor, bool shown);   // 위젯을 그 모니터에 놓거나 뺀다
+        void RemoveWidget(string id);
         IList<string> SceneUsers(string scene);   // 그 장면을 배경으로 쓰는 디스플레이 이름
         void DeleteScene(string scene);           // 쓰던 화면은 Windows 배경화면으로 돌린다
         void ApplyPerformance();
@@ -43,8 +43,14 @@ namespace Wallpaper
 
         public sealed class WidgetEntry
         {
-            public string Id, Name, Kind;   // Kind: builtin | hardware | script
-            public bool Enabled;
+            public string Id, Name, Kind;   // Kind: clock | calendar | hardware | script
+            public readonly List<WidgetMonitor> Monitors = new List<WidgetMonitor>();   // 연결된 모니터 + 놓였지만 연결이 끊긴 모니터
+        }
+
+        public sealed class WidgetMonitor
+        {
+            public string Key, Name;
+            public bool Connected, Shown;
         }
 
         // 장면 미리보기 그림(파일 수정 시각이 같으면 다시 그리지 않는다)
@@ -55,13 +61,10 @@ namespace Wallpaper
         private readonly UserPreferences preferences;
         private readonly ISettingsHost host;
         private List<DisplayEntry> displays = new List<DisplayEntry>();
-        private string device;   // 위젯 탭에서 고른 화면(메인 또는 서브)
         private readonly ComboBox sceneChoice = new ComboBox { Width = 220 };
         private readonly ComboBox mainChoice = new ComboBox();
         private readonly TextBlock mainInfo = new TextBlock();
         private readonly StackPanel subRows = new StackPanel();
-        private Button widgetMainButton, widgetSubButton;
-        private ComboBox widgetSubChoice;
         private IList<SceneDefinition> scenes = new List<SceneDefinition>();
         private readonly StackPanel widgetRows = new StackPanel();
         private readonly StackPanel sceneRows = new StackPanel();
@@ -174,19 +177,17 @@ namespace Wallpaper
 
         private static string Info(DisplayEntry display)
         {
-            return display.Width + " × " + display.Height + " · " + display.Background + " · 위젯 " + display.Widgets + "개";
+            return display.Width + " × " + display.Height + " · " + display.Background + " · 놓인 위젯 " + display.Widgets + "개";
         }
 
-        // ---- 위젯 탭: 고른 디스플레이의 위젯 목록·추가·제거·설정 ----
+        // ---- 위젯 탭: 모든 모니터 공용 위젯 목록. 위젯마다 놓을 모니터를 고른다(여러 모니터에 함께 놓을 수 있다) ----
         private FrameworkElement WidgetTab()
         {
             var panel = new StackPanel();
-            panel.Children.Add(Label("모니터", 0));
-            panel.Children.Add(Card(RoleRow(), new Thickness(16, 14, 14, 14)));
-            var header = new Grid { Margin = new Thickness(0, 18, 0, 8) };
+            var header = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             header.ColumnDefinitions.Add(new ColumnDefinition());
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var title = Label("위젯 · 켜고 끄기는 레이아웃 편집의 위젯 ▾", 0);
+            var title = Label("위젯 · 모든 모니터 공용 · 모니터 ▾로 놓을 화면을 고릅니다", 0);
             title.Margin = new Thickness(2, 0, 0, 0);
             title.VerticalAlignment = VerticalAlignment.Bottom;
             header.Children.Add(title);
@@ -198,80 +199,77 @@ namespace Wallpaper
             panel.Children.Add(header);
             AutomationProperties.SetAutomationId(widgetRows, "WidgetRows");
             panel.Children.Add(Card(widgetRows));
+            panel.Children.Add(new TextBlock
+            {
+                Text = "위치·크기는 디스플레이 탭의 레이아웃 편집에서 모니터마다 따로 정하고, 설정 값은 모든 모니터가 함께 씁니다. 연결이 끊긴 모니터에 놓인 위젯은 숨겨 두었다가 다시 연결되면 그 자리에 표시합니다.",
+                Style = ModernTheme.Style("Bae.Text.Hint"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 10, 0, 0)
+            });
             return panel;
-        }
-
-        // 위젯 탭: [메인 모니터] [서브 모니터] (서브가 여럿이면 고르기) + 레이아웃 편집
-        private Grid RoleRow()
-        {
-            widgetMainButton = new Button { Content = "메인 모니터" };
-            AutomationProperties.SetAutomationId(widgetMainButton, "WidgetMain");
-            widgetMainButton.Click += delegate { var main = MainEntry; if (main != null) { device = main.Device; ShowSelected(); } };
-            widgetSubButton = new Button { Content = "서브 모니터", Margin = new Thickness(8, 0, 0, 0) };
-            AutomationProperties.SetAutomationId(widgetSubButton, "WidgetSub");
-            widgetSubButton.Click += delegate
-            {
-                var subs = SubEntries;
-                if (subs.Count == 0) return;
-                int index = Math.Max(0, widgetSubChoice.SelectedIndex);
-                device = subs[Math.Min(index, subs.Count - 1)].Device;
-                ShowSelected();
-            };
-            widgetSubChoice = new ComboBox { Margin = new Thickness(8, 0, 0, 0), MinWidth = 120 };
-            AutomationProperties.SetAutomationId(widgetSubChoice, "WidgetSubSelector");
-            widgetSubChoice.SelectionChanged += delegate
-            {
-                var subs = SubEntries;
-                if (loading || widgetSubChoice.SelectedIndex < 0 || widgetSubChoice.SelectedIndex >= subs.Count) return;
-                device = subs[widgetSubChoice.SelectedIndex].Device;
-                ShowSelected();
-            };
-            var edit = new Button { Content = "레이아웃 편집", Margin = new Thickness(8, 0, 0, 0) };
-            AutomationProperties.SetAutomationId(edit, "WidgetEditLayout");
-            edit.Click += delegate { if (device != null) host.OpenLayoutEditor(device); };
-            var row = new Grid();
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.Children.Add(widgetMainButton);
-            Grid.SetColumn(widgetSubButton, 1);
-            row.Children.Add(widgetSubButton);
-            Grid.SetColumn(widgetSubChoice, 2);
-            widgetSubChoice.HorizontalAlignment = HorizontalAlignment.Left;
-            row.Children.Add(widgetSubChoice);
-            Grid.SetColumn(edit, 3);
-            row.Children.Add(edit);
-            return row;
         }
 
         private void RefreshWidgets()
         {
             widgetRows.Children.Clear();
-            if (device == null) return;
-            foreach (var widget in host.Widgets(device))
+            var widgets = host.Widgets().ToList();
+            if (widgets.Count == 0)
+                widgetRows.Children.Add(new TextBlock { Text = "위젯이 없습니다. 위젯 추가 ▾로 놓아 보세요.", Style = ModernTheme.Style("Bae.Text.Subtitle"), Margin = new Thickness(0, 12, 0, 12) });
+            foreach (var widget in widgets)
             {
                 if (widgetRows.Children.Count > 0) widgetRows.Children.Add(Divider());
-                var id = widget.Id;
+                var entry = widget;
                 var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                if (widget.Kind == "hardware")
-                    buttons.Children.Add(SmallButton("설정", "WidgetOptions_" + id, () => host.EditHardware(device, id)));
-                else
-                    buttons.Children.Add(SmallButton("설정", "WidgetOptions_" + id, () => host.EditWidgetOptions(device, id)));
-                if (widget.Kind != "builtin")
-                    buttons.Children.Add(SmallButton("제거", "RemoveWidget_" + id, () => host.RemoveWidget(device, id)));
-                var kind = widget.Kind == "builtin" ? "기본 위젯" : widget.Kind == "hardware" ? "하드웨어 상태" : "스크립트 위젯";
-                widgetRows.Children.Add(Row(widget.Name, kind + (widget.Enabled ? "" : " · 꺼짐"), widget.Enabled, buttons));
+                var place = new Button { Content = "모니터 ▾", Padding = new Thickness(12, 4, 12, 4), MinWidth = 0, MinHeight = 28, Margin = new Thickness(6, 0, 0, 0) };
+                AutomationProperties.SetAutomationId(place, "WidgetMonitors_" + entry.Id);
+                place.Click += delegate { ShowMonitorMenu(place, entry); };
+                buttons.Children.Add(place);
+                buttons.Children.Add(SmallButton("설정", "WidgetOptions_" + entry.Id, () => host.EditWidget(entry.Id)));
+                buttons.Children.Add(SmallButton("제거", "RemoveWidget_" + entry.Id, () => host.RemoveWidget(entry.Id)));
+                var kind = entry.Kind == "clock" || entry.Kind == "calendar" ? "기본 위젯" : entry.Kind == "hardware" ? "하드웨어 상태" : "스크립트 위젯";
+                var shown = entry.Monitors.Where(m => m.Shown).Select(m => m.Name).ToList();
+                widgetRows.Children.Add(Row(entry.Name, kind + " · " + (shown.Count > 0 ? String.Join(", ", shown) : "놓인 모니터 없음"), shown.Count > 0, buttons));
             }
         }
 
-        // 위젯 추가 메뉴: 하드웨어 상태(내 PC·SSH) + widgets 폴더의 스크립트 위젯
+        // 위젯을 놓을 모니터(체크 메뉴). 여러 개를 연달아 바꿀 수 있게 눌러도 닫히지 않고, 닫히면 목록을 새로 고친다.
+        private void ShowMonitorMenu(Button anchor, WidgetEntry entry)
+        {
+            var menu = Menu(anchor);
+            for (int i = 0; i < entry.Monitors.Count; i++)
+            {
+                var target = entry.Monitors[i];
+                var item = new MenuItem { Header = target.Name, IsCheckable = true, IsChecked = target.Shown, StaysOpenOnClick = true };
+                AutomationProperties.SetAutomationId(item, "WidgetMonitor_" + i);
+                item.Click += delegate
+                {
+                    try
+                    {
+                        host.ShowWidget(entry.Id, target.Key, item.IsChecked);
+                        ShowStatus("적용했습니다.", "Bae.Success");
+                    }
+                    catch (Exception error) { ShowStatus("적용하지 못했습니다. " + error.Message, "Bae.Danger"); }
+                };
+                menu.Items.Add(item);
+            }
+            if (entry.Monitors.Count == 0) menu.Items.Add(new MenuItem { Header = "연결된 모니터가 없습니다", IsEnabled = false });
+            menu.Closed += delegate { if (IsVisible) RefreshDisplays(); };
+            menu.IsOpen = true;
+        }
+
+        // 위젯 추가 메뉴: 시계·달력·하드웨어 상태(내 PC·SSH) + widgets 폴더의 스크립트 위젯. 새 위젯은 메인 모니터에 놓인다.
         private void ShowAddMenu(Button anchor)
         {
             var menu = Menu(anchor);
+            foreach (var builtIn in new[] { new[] { "clock", "시계", "큰 플립 시계" }, new[] { "calendar", "달력", "월간 달력 · 오늘 날짜 표시" } })
+            {
+                var kind = builtIn[0];
+                var item = new MenuItem { Header = builtIn[1], ToolTip = builtIn[2] };
+                AutomationProperties.SetAutomationId(item, "Add_" + kind);
+                item.Click += delegate { Run(() => host.AddWidget(kind, null)); };
+                menu.Items.Add(item);
+            }
             var hardware = new MenuItem { Header = "하드웨어 상태 (내 PC · SSH)", ToolTip = "CPU·RAM·GPU·네트워크. 다른 PC는 SSH로 연결합니다." };
             AutomationProperties.SetAutomationId(hardware, "AddHardwareWidget");
-            hardware.Click += delegate { if (device != null) Run(() => host.EditHardware(device, null)); };
+            hardware.Click += delegate { Run(() => host.AddWidget("hardware", null)); };
             menu.Items.Add(hardware);
             var types = host.ScriptTypes();
             if (types.Count > 0) menu.Items.Add(new Separator());
@@ -280,7 +278,7 @@ namespace Wallpaper
                 var item = new MenuItem { Header = type.Name, ToolTip = type.Description.Length > 0 ? type.Description : null };
                 AutomationProperties.SetAutomationId(item, "AddScript_" + type.Id);
                 var id = type.Id;
-                item.Click += delegate { if (device != null) Run(() => host.AddScript(device, id)); };
+                item.Click += delegate { Run(() => host.AddWidget("script", id)); };
                 menu.Items.Add(item);
             }
             menu.IsOpen = true;
@@ -522,7 +520,6 @@ namespace Wallpaper
             displays = host.Displays().ToList();
             var main = MainEntry;
             var subs = SubEntries;
-            if (device == null || !displays.Any(d => d.Device == device)) device = main != null ? main.Device : displays.Count > 0 ? displays[0].Device : null;
             loading = true;
             mainChoice.Items.Clear();
             foreach (var display in displays) mainChoice.Items.Add(display.Name + (display.Primary ? " (Windows 주 모니터)" : ""));
@@ -537,8 +534,6 @@ namespace Wallpaper
                 var target = subs[i].Device;
                 subRows.Children.Add(Row(subs[i].Name, Info(subs[i]), true, SmallButton("레이아웃 편집", "EditSubDisplay_" + i, () => host.OpenLayoutEditor(target))));
             }
-            widgetSubChoice.Items.Clear();
-            foreach (var display in subs) widgetSubChoice.Items.Add(display.Name);
             scenes = host.Scenes();
             sceneChoice.Items.Clear();
             sceneChoice.Items.Add("Windows 배경화면");
@@ -548,24 +543,8 @@ namespace Wallpaper
             if (chosen < 0 && current.Length > 0) sceneChoice.Items.Add(current + " (파일 없음)");
             sceneChoice.SelectedIndex = chosen >= 0 ? chosen + 1 : current.Length > 0 ? sceneChoice.Items.Count - 1 : 0;
             loading = false;
-            ShowSelected();
-            RefreshScenes();
-        }
-
-        // 위젯 탭: 고른 화면(메인/서브) 표시와 위젯 목록
-        private void ShowSelected()
-        {
-            loading = true;
-            var main = MainEntry;
-            var subs = SubEntries;
-            bool onMain = main != null && device == main.Device;
-            widgetMainButton.Style = ModernTheme.Style(onMain ? (object)"AccentButton" : typeof(Button));
-            widgetSubButton.Style = ModernTheme.Style(!onMain && subs.Count > 0 ? (object)"AccentButton" : typeof(Button));
-            widgetSubButton.IsEnabled = subs.Count > 0;
-            widgetSubChoice.Visibility = subs.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
-            widgetSubChoice.SelectedIndex = subs.FindIndex(d => d.Device == device);
             RefreshWidgets();
-            loading = false;
+            RefreshScenes();
         }
 
         // 앱에 요청하고 결과를 보인 뒤 목록을 새로 고친다. 확인 창에서 취소하면 아무것도 하지 않는다.
