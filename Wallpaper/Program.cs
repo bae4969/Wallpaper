@@ -525,32 +525,12 @@ namespace Wallpaper
             Dispatcher.BeginInvoke(new Action(() => OpenEditor(device)));
         }
 
-        // 공용 위젯 목록: 위젯마다 연결된 화면(놓였는지)과, 연결이 끊겼지만 놓여 있는 화면
+        // 공용 위젯 목록
         IEnumerable<SettingsWindow.WidgetEntry> ISettingsHost.Widgets()
         {
             var names = WidgetNames();
-            var main = MainScreen(Monitors.All());
-            var entries = new List<SettingsWindow.WidgetEntry>();
-            foreach (var widget in preferences.Widgets)
-            {
-                var entry = new SettingsWindow.WidgetEntry { Id = widget.Id, Name = names[widget.Id], Kind = widget.Kind };
-                foreach (var monitor in OrderedMonitors)
-                {
-                    var spot = widget.Monitors.FirstOrDefault(p => p.Monitor == monitor.Key || p.Monitor == monitor.Screen.DeviceName);
-                    entry.Monitors.Add(new SettingsWindow.WidgetMonitor
-                    {
-                        Key = monitor.Key, Connected = true, Shown = spot != null && spot.Enabled,
-                        Name = DisplayName(monitor.Screen.DeviceName) + (main != null && main.DeviceName == monitor.Screen.DeviceName ? " (메인)" : "")
-                    });
-                }
-                foreach (var spot in widget.Monitors.Where(p => p.Enabled && !monitors.Values.Any(m => p.Monitor == m.Key || p.Monitor == m.Screen.DeviceName)))
-                    entry.Monitors.Add(new SettingsWindow.WidgetMonitor { Key = spot.Monitor, Name = DisplayName(spot.Device) + " (연결 안 됨)", Shown = true });
-                entries.Add(entry);
-            }
-            return entries;
+            return preferences.Widgets.Select(widget => new SettingsWindow.WidgetEntry { Id = widget.Id, Name = names[widget.Id], Kind = widget.Kind }).ToList();
         }
-
-        void ISettingsHost.ShowWidget(string id, string monitor, bool shown) { ShowWidget(id, monitor, shown); }
 
         void ISettingsHost.EditWidget(string id)
         {
@@ -560,7 +540,7 @@ namespace Wallpaper
             else EditOptions(widget);
         }
 
-        // 새 위젯은 메인 모니터에 놓는다. 하드웨어 상태는 먼저 연결 설정 창을 연다.
+        // 새 위젯은 목록에만 넣는다(화면에 놓기는 레이아웃 편집의 위젯 ▾). 하드웨어 상태는 먼저 연결 설정 창을 연다.
         void ISettingsHost.AddWidget(string kind, string type)
         {
             if (kind == "hardware") { EditHardware(null); return; }
@@ -603,34 +583,27 @@ namespace Wallpaper
 
         private void AddToList(WidgetSettings widget)
         {
-            var main = MainScreen(Monitors.All());
-            MonitorRuntime monitor;
-            if (main != null && monitors.TryGetValue(main.DeviceName, out monitor))
-                widget.Monitors.Add(new MonitorPlacement { Monitor = monitor.Key, Device = main.DeviceName });
             preferences.Widgets.Add(widget);
             SavePreferences();
-            SyncWidgets();
         }
 
-        // 위젯을 화면에 놓거나 뺀다. 뺀 자리는 지우지 않아 다시 놓으면 마지막 자리로 돌아간다.
-        private void ShowWidget(string id, string key, bool shown)
+        // 레이아웃 편집의 위젯 ▾: 위젯을 이 화면에 놓거나 뺀다. 뺀 자리는 지우지 않아 다시 놓으면 마지막 자리로 돌아간다.
+        private void ShowWidget(MonitorRuntime monitor, string id, bool shown)
         {
             var widget = preferences.Widget(id);
             if (widget == null) return;
-            var monitor = monitors.Values.FirstOrDefault(m => m.Key == key);
-            var spot = monitor != null ? Spot(widget, monitor) : widget.Monitors.FirstOrDefault(p => p.Monitor == key);
+            var spot = Spot(widget, monitor);
             if (spot == null)
             {
                 if (!shown) return;
-                spot = new MonitorPlacement { Monitor = key, Device = monitor != null ? monitor.Screen.DeviceName : "" };
+                spot = new MonitorPlacement { Monitor = monitor.Key, Device = monitor.Screen.DeviceName };
                 widget.Monitors.Add(spot);
             }
-            if (spot.Enabled == shown && (monitor == null || monitor.Items.ContainsKey(id) == shown)) return;
+            if (spot.Enabled == shown && monitor.Items.ContainsKey(id) == shown) return;
             spot.Enabled = shown;
             foreach (var each in monitors.Values) each.Failed.Remove(id);
             SavePreferences();
             SyncWidgets();
-            if (monitor != null && editorWindow != null && editing == monitor) editorWindow.RefreshWidget(id);
         }
 
         // 위젯 대화 상자의 주인: 편집 창이 열려 있으면 그것, 아니면 설정 창
@@ -721,7 +694,7 @@ namespace Wallpaper
             }
             var window = new LayoutEditorWindow(monitor.Screen, EditorBackground(monitor), monitor.Widgets, monitor.Widgets.ContainsKey,
                 () => WidgetNames().ToArray(),
-                (id, enabled) => ShowWidget(id, monitor.Key, enabled), (id, placement) => ApplyLayout(monitor, id, placement));
+                (id, enabled) => ShowWidget(monitor, id, enabled), (id, placement) => ApplyLayout(monitor, id, placement));
             window.Title = "Wallpaper · " + DisplayName(device) + " 편집";
             editorWindow = window;
             editing = monitor;
@@ -780,7 +753,7 @@ namespace Wallpaper
             previewHandlers.Remove(id);
         }
 
-        // 하드웨어 상태 설정 창. id 가 null 이면 새 위젯(메인 모니터에 놓는다). 바꾸면 수집과 모든 화면의 위젯을 새로 만든다.
+        // 하드웨어 상태 설정 창. id 가 null 이면 새 위젯(목록에만 넣는다). 바꾸면 수집과 모든 화면의 위젯을 새로 만든다.
         private void EditHardware(string id)
         {
             var widget = id == null ? null : preferences.Widget(id);
