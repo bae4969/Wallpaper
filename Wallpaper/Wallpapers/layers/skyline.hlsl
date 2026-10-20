@@ -29,7 +29,7 @@ float4 PS(V i) : SV_Target
         && rel.x > cellSize.x * 0.5 && rel.x < (0.92 * width) - cellSize.x * 0.5 && rel.y > cellSize.y * 0.6;
     float hc = Hash21(cell + k * 7.31 + Seed);
     float lit = step(hc, P[4].x);
-    float twinkle = Hash21(cell + k * 3.7 + floor(Time * P[4].y * (0.2 + hc) + hc * 50));
+    float twinkle = Hash21(cell + k * 3.7 + WrapCell(floor(Time * P[4].y * (0.2 + hc) + hc * 50)));
     lit *= step(0.07, twinkle);
     if (window && lit > 0)
     {

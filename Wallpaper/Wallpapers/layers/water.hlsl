@@ -20,7 +20,7 @@ float3 RainRing(float2 px, float perspective, float cell, float span, float top,
     float d = length(local);
     float t = Time * (0.8 + 0.4 * h3) + h1 * 9.0;
     float phase = frac(t);
-    if (Hash21(id + floor(t) * 3.17) > 0.4) return 0;   // 칸마다 가끔씩만 떨어진다
+    if (Hash21(id + WrapCell(floor(t)) * 3.17) > 0.4) return 0;   // 칸마다 가끔씩만 떨어진다
     float x = d - (0.04 + phase * 0.42);
     float fade = (1 - phase) * (1 - phase) * smoothstep(0.5, 0.4, d);
     float wave = sin(x * 45) * exp(-x * x * 400) * fade;
