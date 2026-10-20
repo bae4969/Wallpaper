@@ -89,7 +89,7 @@ Wallpaper.exe --render-set my-scene set.png --main 2560x1440 --screen 1920x1080@
 | vignette | fullscreen | 가장자리 어둡게 |
 | aurora | fullscreen | 흔들리는 오로라 커튼 두 겹 |
 | ridge | fullscreen | 생성형 산 능선 실루엣. seed·scale 을 바꿔 여러 겹 |
-| water | post | 잔물결 수면. 그때까지 그린 화면을 일렁이게 하고 어둡게·색조를 입힘 |
+| water | post | 잔물결 수면. 그때까지 그린 화면을 원근 물결 줄로 일렁이게 하고 어둡게·색조를 입힘 |
 | meteor | fullscreen | 드물게 떨어지는 별똥별 |
 | blackhole | fullscreen | 블랙홀(광자 고리·빛이 휘어 감기는 강착원반) |
 | nebula | fullscreen | 천천히 흐르는 색 성운과 어두운 먼지 띠 |
