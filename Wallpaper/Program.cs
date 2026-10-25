@@ -84,6 +84,9 @@ namespace Wallpaper
         private LayoutEditorWindow editorWindow;
         private SettingsWindow settingsWindow;
         private MonitorRuntime editing;
+        private DesktopMemoInput memoInput;
+        private MemoEditorWindow memoEditor;
+        private string memoEditingId;
 
         public ClockApplication()
         {
@@ -319,6 +322,7 @@ namespace Wallpaper
                 }
             }
             UpdateFeeds();
+            UpdateMemoInput();
             if (dirty)
             {
                 dirty = false;
@@ -370,7 +374,7 @@ namespace Wallpaper
                 }
                 if (runtime.Script.Metrics) { LocalMetrics.Acquire(); runtime.UsesMetrics = true; }
             }
-            runtime.Widget = new DesktopWidget("Wallpaper." + widget.Id, view, monitor.Scene);
+            runtime.Widget = new DesktopWidget("Wallpaper." + widget.Id, view, monitor.Scene, IsMemo(runtime));
             monitor.Items.Add(widget.Id, runtime);
             monitor.Widgets.Add(widget.Id, runtime.Widget);
             runtime.Widget.Show();
@@ -388,6 +392,7 @@ namespace Wallpaper
 
         private void DestroyWidget(MonitorRuntime monitor, string id)
         {
+            if (memoEditingId == id && memoEditor != null) memoEditor.Close();
             var runtime = monitor.Items[id];
             monitor.Items.Remove(id);
             if (runtime.UsesMetrics) LocalMetrics.Release();
@@ -685,6 +690,7 @@ namespace Wallpaper
         // 화면 하나의 레이아웃 편집. 위젯 ▾ 메뉴에는 공용 목록 전체가 나오고, 체크하면 그 위젯을 이 화면에 놓는다.
         private void OpenEditor(string device)
         {
+            if (memoEditor != null) memoEditor.Close();
             MonitorRuntime monitor;
             if (!monitors.TryGetValue(device, out monitor)) return;
             if (editorWindow != null)
@@ -840,6 +846,57 @@ namespace Wallpaper
             }
         }
 
+        // 메모가 하나라도 놓였을 때만 더블클릭을 관찰한다. 입력 이벤트는 바탕화면으로 그대로 통과한다.
+        private void UpdateMemoInput()
+        {
+            bool needed = monitors.Values.Any(m => m.Items.Values.Any(IsMemo));
+            if (!needed && memoInput != null) { memoInput.Dispose(); memoInput = null; }
+            if (!needed || memoInput != null) return;
+            try { memoInput = new DesktopMemoInput(Dispatcher, OpenMemoAt); }
+            catch (System.ComponentModel.Win32Exception error) { ReportError("메모 편집 오류", "바탕화면 입력을 연결하지 못했습니다.", error); }
+        }
+
+        private static bool IsMemo(WidgetRuntime runtime)
+        {
+            return runtime.Settings.Kind == "script" && runtime.Settings.Type == "memo" && runtime.Script != null;
+        }
+
+        private async void OpenMemoAt(Native.Point point)
+        {
+            if (shuttingDown || editorWindow != null || memoEditor != null) return;
+            var runtime = monitors.Values.Where(m => m.Screen.Bounds.Contains(point.X, point.Y))
+                .SelectMany(m => m.Items.Values).Where(IsMemo)
+                .OrderByDescending(r => r.Widget.LayerIndex)
+                .FirstOrDefault(r => r.Widget.ContentBounds.Contains(point.X, point.Y));
+            if (runtime == null) return;
+            var target = DesktopMemoInput.WindowAt(point);
+            var foreground = DesktopMemoInput.Foreground;
+            if (!await System.Threading.Tasks.Task.Run(() => DesktopMemoInput.IsEmptyDesktop(point))) return;
+            // UIA 판정 중 화면·창이 바뀌었으면 늦게 편집 창을 열어 포커스를 빼앗지 않는다.
+            if (shuttingDown || editorWindow != null || memoEditor != null || DesktopMemoInput.WindowAt(point) != target ||
+                DesktopMemoInput.Foreground != foreground ||
+                !monitors.Values.Any(m => m.Items.Values.Contains(runtime))) return;
+            var widget = runtime.Settings;
+            var parameters = runtime.Script.Parameters.ToDictionary(p => p.Name);
+            WidgetParameter text, size, color, align;
+            if (!parameters.TryGetValue("text", out text) || !parameters.TryGetValue("size", out size) ||
+                !parameters.TryGetValue("color", out color) || !parameters.TryGetValue("align", out align)) return;
+            System.Windows.TextAlignment alignment;
+            if (!Enum.TryParse(Convert.ToString(align.Value(widget.Options)), out alignment)) alignment = System.Windows.TextAlignment.Left;
+            double zoom = runtime.Widget.DpiScale * runtime.Widget.DisplayScale;
+            var window = new MemoEditorWindow(runtime.Widget.ContentBounds, Convert.ToString(text.Value(widget.Options)),
+                Convert.ToDouble(size.Value(widget.Options)) * zoom, color.Value(widget.Options) as System.Windows.Media.Brush, alignment,
+                value => { widget.Options["text"] = value; ApplyOptions(widget); }, () =>
+                {
+                    try { preferences.Save(); return true; }
+                    catch (Exception error) { SceneLibrary.LogError("메모 저장 실패: " + error.Message); return false; }
+                });
+            memoEditor = window;
+            memoEditingId = widget.Id;
+            window.Closed += delegate { if (memoEditor == window) { memoEditor = null; memoEditingId = null; } };
+            window.Show();
+        }
+
         // 위젯마다 정한 간격(interval 초)의 시각 경계에서 다시 그린다(초 단위면 초가 바뀔 때).
         private void RenderScripts(DateTime now)
         {
@@ -908,7 +965,13 @@ namespace Wallpaper
             var bounds = screen.Bounds;
             var margin = (int)Math.Round(36 * widget.DpiScale);
             double scale = placement == null ? 1 : placement.Scale;
-            scale = Math.Min(scale, Math.Min(bounds.Width / widget.BaseContentPixelWidth, bounds.Height / widget.BaseContentPixelHeight));
+            if (widget.FreeResize)
+            {
+                var size = WidgetPlacement.MemoSize(placement, new System.Windows.Size(runtime.Script.Width, runtime.Script.Height),
+                    new System.Windows.Size(bounds.Width, bounds.Height), widget.DpiScale, out scale);
+                widget.ResizeContent(size.Width, size.Height);
+            }
+            else scale = Math.Min(scale, Math.Min(bounds.Width / widget.BaseContentPixelWidth, bounds.Height / widget.BaseContentPixelHeight));
             int width = (int)Math.Round(widget.BasePixelWidth * scale);
             int height = (int)Math.Round(widget.BasePixelHeight * scale);
             var content = widget.ContentArea;
@@ -1041,6 +1104,8 @@ namespace Wallpaper
         protected override void OnExit(ExitEventArgs e)
         {
             shuttingDown = true;
+            if (memoInput != null) memoInput.Dispose();
+            if (memoEditor != null) memoEditor.Close();
             SystemEvents.DisplaySettingsChanged -= DisplayChanged;
             SystemEvents.UserPreferenceChanged -= PreferenceChanged;
             if (timer != null) timer.Stop();

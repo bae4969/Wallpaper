@@ -90,6 +90,16 @@ namespace Wallpaper
             AutomationProperties.SetAutomationId(control, "Option_" + parameter.Name);
             AutomationProperties.SetName(control, parameter.Label);
             var row = new Grid { Margin = new Thickness(0, 9, 0, 9) };
+            if (parameter.Type == "text" && parameter.Multiline)
+            {
+                row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                control.Margin = new Thickness(0, 8, 0, 0);
+                Grid.SetRow(control, 1);
+                row.Children.Add(label);
+                row.Children.Add(control);
+                return row;
+            }
             row.ColumnDefinitions.Add(new ColumnDefinition());
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.Children.Add(label);
@@ -142,7 +152,16 @@ namespace Wallpaper
                     };
                     return numberBox;
                 default:
-                    var textBox = new TextBox { Width = 200, Text = current };
+                    var textBox = new TextBox { Text = current };
+                    if (parameter.Multiline)
+                    {
+                        textBox.Height = 130;
+                        textBox.AcceptsReturn = true;
+                        textBox.TextWrapping = TextWrapping.Wrap;
+                        textBox.VerticalContentAlignment = VerticalAlignment.Top;
+                        textBox.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+                    }
+                    else textBox.Width = 200;
                     textBox.TextChanged += delegate { Set(parameter, textBox.Text); };
                     return textBox;
             }

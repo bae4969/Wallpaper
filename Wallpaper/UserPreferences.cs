@@ -306,8 +306,17 @@ namespace Wallpaper
                 Double.IsNaN(x) || Double.IsNaN(y) || Double.IsNaN(scale) ||
                 Double.IsInfinity(x) || Double.IsInfinity(y) || Double.IsInfinity(scale) ||
                 x < 0 || x > 1 || y < 0 || y > 1 || scale <= 0) return null;
-            return new WidgetPlacement { X = x, Y = y, Scale = scale,
+            double width = ReadSize(element, "width"), height = ReadSize(element, "height");
+            if (width == 0 || height == 0) width = height = 0;
+            return new WidgetPlacement { X = x, Y = y, Scale = scale, Width = width, Height = height,
                 ContentAnchored = (string)element.Attribute("anchor") == "content" };
+        }
+
+        private static double ReadSize(XElement element, string name)
+        {
+            double value;
+            return Double.TryParse((string)element.Attribute(name), NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
+                Double.IsFinite(value) && value > 0 ? value : 0;
         }
 
         private static XElement WritePlacement(string name, WidgetPlacement placement, bool enabled)
@@ -317,6 +326,8 @@ namespace Wallpaper
             {
                 element.Add(new XAttribute("x", placement.X), new XAttribute("y", placement.Y),
                     new XAttribute("scale", placement.Scale));
+                if (placement.Width > 0 && placement.Height > 0)
+                    element.Add(new XAttribute("width", placement.Width), new XAttribute("height", placement.Height));
                 if (placement.ContentAnchored) element.Add(new XAttribute("anchor", "content"));
             }
             return element;
@@ -357,6 +368,19 @@ namespace Wallpaper
     {
         public double X, Y;
         public double Scale = 1;
+        public double Width, Height;  // 메모의 배율 적용 전 내용 크기(DIP). 둘 다 0이면 예전 비율 고정 배치.
         public bool ContentAnchored;
+
+        public static System.Windows.Size MemoSize(WidgetPlacement placement, System.Windows.Size initial,
+            System.Windows.Size screen, double dpi, out double scale)
+        {
+            scale = placement == null ? 1 : placement.Scale;
+            bool custom = placement != null && placement.Width > 0 && placement.Height > 0;
+            double width = custom ? placement.Width : initial.Width;
+            double height = custom ? placement.Height : initial.Height;
+            // 예전 배치의 글자 배율도 유지한다. 새 크기는 글자 배율을 바꾸지 않고 축별로 화면에 맞춘다.
+            if (!custom) scale = Math.Min(scale, Math.Min(screen.Width / (width * dpi), screen.Height / (height * dpi)));
+            return new System.Windows.Size(Math.Min(width, screen.Width / (dpi * scale)), Math.Min(height, screen.Height / (dpi * scale)));
+        }
     }
 }

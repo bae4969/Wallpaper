@@ -37,12 +37,16 @@ float Hash21(float2 p)
     return frac(p.x * p.y);
 }
 
+// 정수 격자 번호를 -2048~2047 로 감는다(그 안의 값은 그대로). Hash21 은 수천을 넘는 값에서 float 정밀도를 잃어
+// 무늬가 뭉개지므로(앱을 오래 켜 두면 Time 에 비례해 커지는 좌표), 시간이 들어가는 해시 입력은 이것으로 감아 쓴다.
+float2 WrapCell(float2 i) { return i - 4096 * floor((i + 2048) / 4096); }
+
 float Noise(float2 p)
 {
     float2 i = floor(p), f = frac(p);
     float2 u = f * f * (3 - 2 * f);
-    return lerp(lerp(Hash21(i), Hash21(i + float2(1, 0)), u.x),
-                lerp(Hash21(i + float2(0, 1)), Hash21(i + float2(1, 1)), u.x), u.y);
+    return lerp(lerp(Hash21(WrapCell(i)), Hash21(WrapCell(i + float2(1, 0))), u.x),
+                lerp(Hash21(WrapCell(i + float2(0, 1))), Hash21(WrapCell(i + float2(1, 1))), u.x), u.y);
 }
 
 float Fbm(float2 p)

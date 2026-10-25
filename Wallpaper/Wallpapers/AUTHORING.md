@@ -89,7 +89,7 @@ Wallpaper.exe --render-set my-scene set.png --main 2560x1440 --screen 1920x1080@
 | vignette | fullscreen | 가장자리 어둡게 |
 | aurora | fullscreen | 흔들리는 오로라 커튼 두 겹 |
 | ridge | fullscreen | 생성형 산 능선 실루엣. seed·scale 을 바꿔 여러 겹 |
-| water | post | 잔물결 수면. 그때까지 그린 화면을 일렁이게 하고 어둡게·색조를 입힘 |
+| water | post | 잔물결 수면. 그때까지 그린 화면을 원근 물결 줄로 일렁이게 하고 어둡게·색조를 입힘 |
 | meteor | fullscreen | 드물게 떨어지는 별똥별 |
 | blackhole | fullscreen | 블랙홀(광자 고리·빛이 휘어 감기는 강착원반) |
 | nebula | fullscreen | 천천히 흐르는 색 성운과 어두운 먼지 띠 |
@@ -169,6 +169,7 @@ float2 ScreenUV(V i);                             // 이 화면 0~1 좌표(post 
 float SpanScale();                                // 캔버스 폭 ÷ 가로 범위 폭(옆 모니터가 없으면 1)
 float Hash11(float n); float Hash21(float2 p);   // 0~1 난수
 float Noise(float2 p); float Fbm(float2 p);       // 값 잡음, 5옥타브 잡음
+float2 WrapCell(float2 i);                        // 정수 격자 번호를 -2048~2047 로 감는다(시간이 들어가는 Hash21 입력용)
 float Dither(float2 pixel);                       // 0~1 디더(띠 줄이기)
 float Unit();                                     // 캔버스 높이 / 1080 (픽셀 값에 곱한다)
 float4 PixelToClip(float2 pixel);                 // 캔버스 픽셀 → 클립 좌표(입자 VS용)
@@ -198,7 +199,7 @@ float4 PS(V i) : SV_Target
 - 사용자는 설정 창에서 프레임 제한(15~144 FPS 14단계/주사율), 렌더 해상도(100~25% 10단계 — 레이어를 낮은 해상도로 그려 확대, `Resolution`도 그 크기), 효과 품질(최고·높음·보통·낮음·최저 = `Quality` 2·1.5·1·0.5·0)을 고른다. 입자 수는 100·80·60·45·30%로 줄고 `Fbm` 반복은 5·4·4·3·3회가 되며, 최저에서는 `post` 레이어를 건너뛴다. 단계가 늘 수 있으므로 셰이더는 `Quality >= 1`처럼 범위로 비교한다. 무거운 셰이더는 `Quality`를 보고 반복 횟수 등을 줄인다. `--render --quality 1.5`처럼 미리 본다.
 - 레이어 하나는 화면 전체 픽셀마다 셰이더를 실행한다. 반복문은 짧게(예: Fbm 5회) 유지한다. 레이어 10개 안팎, 입자 수천 개 정도는 가볍다.
 - 최대화·전체 화면 창이 화면을 덮으면 그리지 않는다.
-- 시간(`Time`)은 계속 커지므로 `sin`·`frac` 등으로 주기를 만든다.
+- 시간(`Time`)은 앱을 켠 뒤 계속 커진다(하루면 86400). `sin`·`frac` 등으로 주기를 만들고, 시간에 비례해 커지는 값을 `Hash21`에 그대로 넣지 않는다 — 수천을 넘으면 float 정밀도가 무너져 무늬가 뭉개진다. `Noise`·`Fbm`은 안에서 격자 번호를 감아 괜찮지만, `Hash21(cell + floor(Time * …))`처럼 직접 쓸 때는 `WrapCell(floor(Time * …))`로 감는다. `--time 100000`으로 그려 오래 켠 뒤의 모습도 확인한다.
 - 오류 메시지의 줄 번호는 레이어 .hlsl 파일 기준이다.
 
 ## 7. 위젯 만들기
@@ -222,7 +223,7 @@ Wallpaper.exe --render-widget memo out.png --option "text=안녕" --option size=
   "interval": 60,                  // 다시 그리는 간격(초, 0.1 이상). 시각 경계에 맞춘다(1이면 초가 바뀔 때)
   "metrics": false,                // true 면 이 PC의 CPU·RAM·GPU·네트워크 측정값을 받는다
   "params": {
-    "text":  { "type": "text",   "label": "내용", "default": "오늘도 좋은 하루" },
+    "text":  { "type": "text", "multiline": true, "label": "내용", "default": "오늘도 좋은 하루" },
     "color": { "type": "color",  "label": "글자 색", "default": "#F0F1F4" },
     "size":  { "type": "number", "label": "글자 크기", "default": 44, "min": 12, "max": 120 },
     "bold":  { "type": "bool",   "label": "굵게", "default": true, "description": "ⓘ 툴팁으로 보이는 설명" },
@@ -233,6 +234,7 @@ Wallpaper.exe --render-widget memo out.png --option "text=안녕" --option size=
 ```
 
 - `type`: `bool`(체크박스) · `choice`(콤보박스, `choices`는 `{ "보이는 이름": "XAML에 넘길 값" }` 또는 이름 배열) · `color`(`#RRGGBB`/`#AARRGGBB`) · `number`(`min`·`max`) · `text`
+- `text`에 `"multiline": true`를 지정하면 설정 창에 Enter 줄바꿈·자동 줄바꿈·세로 스크롤을 지원하는 입력 칸이 생긴다. 기본 `memo` 위젯은 바탕화면에서 더블클릭해 같은 자리에서 편집할 수도 있다(다른 스크립트 위젯에는 직접 편집을 적용하지 않음).
 - XAML에는 형식에 맞는 값으로 들어간다: bool → `true/false`, number → 실수, color → `SolidColorBrush`(색 값 자체는 `ParamColors[이름]`), choice → 고른 항목의 값, text → 문자열.
 
 ### 7.2 화면 `widget.xaml`
