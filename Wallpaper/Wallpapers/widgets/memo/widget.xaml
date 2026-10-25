@@ -1,6 +1,6 @@
 <!-- 메모: text 값을 그대로 보인다. 정렬은 선택지 값(Left/Center/Right)을 TextAlignment 에 바로 넣는다. -->
 <Grid xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-  <TextBlock VerticalAlignment="Center" TextWrapping="Wrap"
+  <TextBlock VerticalAlignment="Top" TextWrapping="Wrap"
              FontFamily="Segoe UI Variable Display, Malgun Gothic" FontWeight="SemiBold"
              Text="{Binding Params[text]}" Foreground="{Binding Params[color]}"
              FontSize="{Binding Params[size]}" TextAlignment="{Binding Params[align]}"/>

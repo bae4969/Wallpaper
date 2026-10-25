@@ -189,15 +189,17 @@ namespace Wallpaper
             var frame = new Frame { Name = name, Root = root, Image = image, Widget = widget, BaseWidth = widget.BaseContentPixelWidth };
             frames[name] = frame;
             root.MouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e) { BeginDrag(frame, "move", e); };
-            foreach (var corner in new[] { "lt", "rt", "lb", "rb" })
+            var handles = widget.FreeResize ? new[] { "lt", "rt", "lb", "rb", "l", "r", "t", "b" } : new[] { "lt", "rt", "lb", "rb" };
+            foreach (var corner in handles)
             {
                 var handle = new Border
                 {
                     Width = 12, Height = 12, Background = Brushes.White,
                     BorderBrush = ModernTheme.Brush("Bae.AccentPress"), BorderThickness = new Thickness(1),
-                    HorizontalAlignment = corner[0] == 'l' ? HorizontalAlignment.Left : HorizontalAlignment.Right,
-                    VerticalAlignment = corner[1] == 't' ? VerticalAlignment.Top : VerticalAlignment.Bottom,
-                    Cursor = corner == "lt" || corner == "rb" ? Cursors.SizeNWSE : Cursors.SizeNESW
+                    HorizontalAlignment = corner.Contains('l') ? HorizontalAlignment.Left : corner.Contains('r') ? HorizontalAlignment.Right : HorizontalAlignment.Center,
+                    VerticalAlignment = corner.Contains('t') ? VerticalAlignment.Top : corner.Contains('b') ? VerticalAlignment.Bottom : VerticalAlignment.Center,
+                    Cursor = corner == "l" || corner == "r" ? Cursors.SizeWE : corner == "t" || corner == "b" ? Cursors.SizeNS
+                        : corner == "lt" || corner == "rb" ? Cursors.SizeNWSE : Cursors.SizeNESW
                 };
                 var captured = corner;
                 handle.MouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e) { BeginDrag(frame, captured, e); };
@@ -256,6 +258,13 @@ namespace Wallpaper
                     frames.Values.Where(f => f != dragging).Select(f => f.Bounds), out guideX, out guideY);
                 ShowGuides(guideX, guideY);
             }
+            else if (dragging.Widget.FreeResize)
+            {
+                double guideX, guideY;
+                bounds = LayoutSnap.ResizeFree(dragStart, new Vector(dx, dy), new Size(canvas.ActualWidth, canvas.ActualHeight),
+                    frames.Values.Where(f => f != dragging).Select(f => f.Bounds), operation, new Size(160, 100), out guideX, out guideY);
+                ShowGuides(guideX, guideY);
+            }
             else
             {
                 bool left = operation[0] == 'l', top = operation[1] == 't';
@@ -282,7 +291,9 @@ namespace Wallpaper
             {
                 X = bounds.Left / canvas.ActualWidth,
                 Y = bounds.Top / canvas.ActualHeight,
-                Scale = bounds.Width * dpi / dragging.BaseWidth,
+                Scale = dragging.Widget.FreeResize ? dragging.Widget.DisplayScale : bounds.Width * dpi / dragging.BaseWidth,
+                Width = dragging.Widget.FreeResize ? bounds.Width / (dpi * dragging.Widget.DisplayScale) : 0,
+                Height = dragging.Widget.FreeResize ? bounds.Height / (dpi * dragging.Widget.DisplayScale) : 0,
                 ContentAnchored = true
             });
         }
@@ -370,6 +381,42 @@ namespace Wallpaper
             guideX = Aligned(new[] { anchorX + directionX * width, anchorX + directionX * width / 2 }, x);
             guideY = Aligned(new[] { anchorY + directionY * height, anchorY + directionY * height / 2 }, y);
             return new Rect(left ? anchorX - width : anchorX, top ? anchorY - height : anchorY, width, height);
+        }
+
+        // 메모 전용: 변을 당기면 한 축만, 모서리를 당기면 두 축을 독립적으로 바꾼다.
+        public static Rect ResizeFree(Rect original, Vector delta, Size area, IEnumerable<Rect> others, string handle,
+            Size minimum, out double guideX, out double guideY)
+        {
+            List<double> x, y;
+            Targets(area, others, out x, out y);
+            bool left = handle.Contains('l'), right = handle.Contains('r'), top = handle.Contains('t'), bottom = handle.Contains('b');
+            double width = original.Width, height = original.Height;
+            guideX = guideY = Double.NaN;
+            if (left || right)
+            {
+                double maximum = left ? original.Right : area.Width - original.Left;
+                width = FreeLength(left ? original.Right : original.Left, left ? -1 : 1, original.Width + (left ? -delta.X : delta.X),
+                    Math.Min(minimum.Width, maximum), maximum, x, out guideX);
+            }
+            if (top || bottom)
+            {
+                double maximum = top ? original.Bottom : area.Height - original.Top;
+                height = FreeLength(top ? original.Bottom : original.Top, top ? -1 : 1, original.Height + (top ? -delta.Y : delta.Y),
+                    Math.Min(minimum.Height, maximum), maximum, y, out guideY);
+            }
+            return new Rect(left ? original.Right - width : original.Left, top ? original.Bottom - height : original.Top, width, height);
+        }
+
+        private static double FreeLength(double anchor, double direction, double requested, double minimum, double maximum,
+            List<double> targets, out double guide)
+        {
+            double current = Math.Max(minimum, Math.Min(requested, maximum)), length = current, best = Double.PositiveInfinity;
+            foreach (double fraction in new[] { 1.0, 0.5 })
+                foreach (double target in targets)
+                    ResizeCandidate(anchor + direction * current * fraction, target, (target - anchor) / (direction * fraction),
+                        current, minimum, maximum, ref length, ref best);
+            guide = Aligned(new[] { anchor + direction * length, anchor + direction * length / 2 }, targets);
+            return length;
         }
 
         private static void ResizeCandidate(double source, double target, double candidate, double current,

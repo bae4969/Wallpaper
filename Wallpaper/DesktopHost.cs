@@ -44,11 +44,14 @@ namespace Wallpaper
         // 위젯이 놓인 모니터 영역. 그림자·합성은 같은 모니터의 위젯끼리만 한다.
         private System.Drawing.Rectangle monitor;
         public int LayerIndex { get { return scene.IndexOf(this); } }
+        public bool FreeResize { get; private set; }
+        public double DisplayScale { get { return scale; } }
         public event Action<BitmapSource> FrameRendered;
 
-        public DesktopWidget(string name, FrameworkElement content, WallpaperScene wallpaperScene = null)
+        public DesktopWidget(string name, FrameworkElement content, WallpaperScene wallpaperScene = null, bool freeResize = false)
         {
             view = content;
+            FreeResize = freeResize;
             wallpaper = wallpaperScene;
             ClearBackground();
             host = Native.FindDesktopHost();
@@ -143,6 +146,19 @@ namespace Wallpaper
         }
 
         public void Show() { renderer.Show(); }
+
+        // 메모는 화면 요소의 크기를 바꿔 다시 줄바꿈한다. Viewbox 배율은 그대로여서 글자가 늘어나지 않는다.
+        public void ResizeContent(double width, double height)
+        {
+            if (!FreeResize) return;
+            var border = (Border)view;
+            var content = (FrameworkElement)border.Child;
+            content.Width = width;
+            content.Height = height;
+            content.ClipToBounds = true;
+            border.Width = width + border.Padding.Left + border.Padding.Right;
+            border.Height = height + border.Padding.Top + border.Padding.Bottom;
+        }
 
         public void SetVisible(bool enabled)
         {

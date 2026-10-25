@@ -22,6 +22,7 @@ namespace Wallpaper
     internal sealed class WidgetParameter
     {
         public string Name, Label, Description, Type, Default;
+        public bool Multiline;
         public List<KeyValuePair<string, string>> Choices = new List<KeyValuePair<string, string>>();   // 보이는 이름 → 값
         public double Min = Double.NegativeInfinity, Max = Double.PositiveInfinity;
 
@@ -31,6 +32,7 @@ namespace Wallpaper
             if (!new[] { "bool", "choice", "color", "number", "text" }.Contains(parameter.Type))
                 throw new InvalidDataException(name + ": type 은 bool, choice, color, number, text 중 하나여야 합니다(" + parameter.Type + ").");
             JsonElement value;
+            parameter.Multiline = element.TryGetProperty("multiline", out value) && value.ValueKind == JsonValueKind.True;
             if (element.TryGetProperty("choices", out value))
             {
                 if (value.ValueKind == JsonValueKind.Array)

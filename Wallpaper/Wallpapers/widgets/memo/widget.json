@@ -1,13 +1,13 @@
 {
   "name": "메모",
-  "description": "짧은 글을 바탕화면에 띄운다.",
+  "description": "여러 줄 메모. 바탕화면에서 더블클릭하면 바로 편집하고 자동 저장한다.",
   "width": 520,
-  "height": 140,
+  "height": 280,
   "interval": 60,
   "params": {
-    "text": { "type": "text", "label": "내용", "default": "오늘도 좋은 하루" },
+    "text": { "type": "text", "multiline": true, "label": "내용", "description": "바탕화면의 메모를 더블클릭해 바로 편집할 수도 있습니다. 입력은 자동 저장됩니다.", "default": "오늘도 좋은 하루" },
     "color": { "type": "color", "label": "글자 색", "default": "#F0F1F4" },
-    "size": { "type": "number", "label": "글자 크기", "default": 44, "min": 12, "max": 120 },
-    "align": { "type": "choice", "label": "정렬", "default": "가운데", "choices": { "왼쪽": "Left", "가운데": "Center", "오른쪽": "Right" } }
+    "size": { "type": "number", "label": "글자 크기", "default": 28, "min": 12, "max": 120 },
+    "align": { "type": "choice", "label": "정렬", "default": "왼쪽", "choices": { "왼쪽": "Left", "가운데": "Center", "오른쪽": "Right" } }
   }
 }

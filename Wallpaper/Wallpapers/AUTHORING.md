@@ -223,7 +223,7 @@ Wallpaper.exe --render-widget memo out.png --option "text=안녕" --option size=
   "interval": 60,                  // 다시 그리는 간격(초, 0.1 이상). 시각 경계에 맞춘다(1이면 초가 바뀔 때)
   "metrics": false,                // true 면 이 PC의 CPU·RAM·GPU·네트워크 측정값을 받는다
   "params": {
-    "text":  { "type": "text",   "label": "내용", "default": "오늘도 좋은 하루" },
+    "text":  { "type": "text", "multiline": true, "label": "내용", "default": "오늘도 좋은 하루" },
     "color": { "type": "color",  "label": "글자 색", "default": "#F0F1F4" },
     "size":  { "type": "number", "label": "글자 크기", "default": 44, "min": 12, "max": 120 },
     "bold":  { "type": "bool",   "label": "굵게", "default": true, "description": "ⓘ 툴팁으로 보이는 설명" },
@@ -234,6 +234,7 @@ Wallpaper.exe --render-widget memo out.png --option "text=안녕" --option size=
 ```
 
 - `type`: `bool`(체크박스) · `choice`(콤보박스, `choices`는 `{ "보이는 이름": "XAML에 넘길 값" }` 또는 이름 배열) · `color`(`#RRGGBB`/`#AARRGGBB`) · `number`(`min`·`max`) · `text`
+- `text`에 `"multiline": true`를 지정하면 설정 창에 Enter 줄바꿈·자동 줄바꿈·세로 스크롤을 지원하는 입력 칸이 생긴다. 기본 `memo` 위젯은 바탕화면에서 더블클릭해 같은 자리에서 편집할 수도 있다(다른 스크립트 위젯에는 직접 편집을 적용하지 않음).
 - XAML에는 형식에 맞는 값으로 들어간다: bool → `true/false`, number → 실수, color → `SolidColorBrush`(색 값 자체는 `ParamColors[이름]`), choice → 고른 항목의 값, text → 문자열.
 
 ### 7.2 화면 `widget.xaml`
