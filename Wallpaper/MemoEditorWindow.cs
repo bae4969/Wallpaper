@@ -16,6 +16,7 @@ namespace Wallpaper
         private readonly Func<bool> save;
         private readonly TextBlock status;
         private bool pending;
+        private bool closing;
 
         public MemoEditorWindow(System.Drawing.Rectangle bounds, string text, double fontSize, Brush color,
             TextAlignment alignment, Action<string> changed, Func<bool> saveChanges)
@@ -78,13 +79,15 @@ namespace Wallpaper
             };
             PreviewKeyDown += delegate(object sender, KeyEventArgs e)
             {
-                if (e.Key == Key.Escape) { e.Handled = true; Close(); }
+                if (e.Key == Key.Escape) { e.Handled = true; if (!closing) Close(); }
                 else if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = true; Flush(); }
             };
-            Deactivated += delegate { Close(); };
+            Deactivated += delegate { if (!closing) Close(); };
             Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e)
             {
-                if (!Flush()) { e.Cancel = true; Activate(); }
+                // 닫는 중 포커스를 잃어 Deactivated가 와도 Close를 다시 호출하지 않는다.
+                closing = true;
+                if (!Flush()) { e.Cancel = true; closing = false; Activate(); }
             };
             Closed += delegate { saveTimer.Stop(); };
         }
