@@ -97,6 +97,7 @@ namespace Wallpaper
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+            SceneLibrary.LogError("앱 시작 PID=" + Process.GetCurrentProcess().Id + " 실행파일=" + Environment.ProcessPath);
             preferences = UserPreferences.Load();
             bool firstRun = !preferences.FromFile;
             try { SceneLibrary.EnsureDefaults(); }
@@ -275,6 +276,7 @@ namespace Wallpaper
                 monitor.SceneDefinition = definition;
                 monitor.RenderScale = preferences.RenderScale;
                 monitor.Scene.Paused = userPaused;
+                SceneLibrary.LogError("배경 생성 " + screen.DeviceName + " " + screen.Bounds + " 장면=" + preferences.Scene);
             }
             catch (Exception error) { ReportSceneError(DisplayName(screen.DeviceName), error); }
         }
@@ -494,7 +496,14 @@ namespace Wallpaper
             bool battery = preferences.PauseOnBattery && Forms.SystemInformation.PowerStatus.PowerLineStatus == Forms.PowerLineStatus.Offline;
             foreach (var monitor in monitors.Values)
                 if (monitor.Scene != null)
-                    monitor.Scene.Paused = userPaused || battery || (preferences.PauseWhenCovered && WallpaperScene.IsCovered(monitor.Screen.Bounds));
+                {
+                    bool covered = preferences.PauseWhenCovered && WallpaperScene.IsCovered(monitor.Screen.Bounds);
+                    bool paused = userPaused || battery || covered;
+                    if (monitor.Scene.Paused == paused) continue;
+                    SceneLibrary.LogError("배경 " + (paused ? "일시정지 " : "재개 ") + monitor.Screen.DeviceName +
+                        " 사용자=" + userPaused + " 배터리=" + battery + " 창가림=" + covered + " frame=" + monitor.Scene.FrameCount);
+                    monitor.Scene.Paused = paused;
+                }
         }
 
         private void OpenSettings()
@@ -1018,16 +1027,20 @@ namespace Wallpaper
         }
 
         // 2초마다 바탕화면 상태를 확인한다.
-        // ① Explorer 가 다시 시작되면 기존 자식 창도 사라지므로 새 창을 만든다.
+        // ① Explorer가 다시 시작되거나 그래픽 출력 실패로 렌더 스레드가 끝나면 새 창·장치를 만든다.
         // ② 화면 구성이 바뀌었는데 알림을 놓쳤으면(원격 데스크톱·잠금 해제 등 세션 전환 중) 다시 맞춘다.
         // ③ 화면 구성 변경 직후 바탕화면 창이 늦게 옮겨져 위젯·배경 창이 어긋났으면 다시 놓는다.
         private void CheckDesktop()
         {
-            if (monitors.Values.Any(monitor => monitor.Widgets.Values.Any(widget => !widget.IsDesktopAttached) ||
-                (monitor.Scene != null && !monitor.Scene.IsAlive)))
+            var detached = monitors.Values.Where(monitor => monitor.Widgets.Values.Any(widget => !widget.IsDesktopAttached) ||
+                (monitor.Scene != null && !monitor.Scene.IsAlive)).ToArray();
+            if (detached.Length > 0)
             {
+                SceneLibrary.LogError("바탕화면 연결·렌더 상태 이상으로 배경 복구: " + String.Join(", ", detached.Select(m => m.Screen.DeviceName)));
                 foreach (var monitor in monitors.Values.ToArray()) DestroyMonitor(monitor);
                 SyncMonitors();
+                SceneLibrary.LogError("배경 복구 결과: " + String.Join(", ", monitors.Values.Select(m => m.Screen.DeviceName + "=" +
+                    (m.Scene != null && m.Scene.IsAlive ? "정상" : "배경 없음"))));
                 return;
             }
             if (Monitors.Describe(Monitors.All()) != topology)
@@ -1111,6 +1124,7 @@ namespace Wallpaper
             mcpStopping.Cancel();
             if (memoInput != null) memoInput.Dispose();
             if (memoEditor != null) memoEditor.Close();
+            SceneLibrary.LogError("앱 종료 PID=" + Process.GetCurrentProcess().Id);
             SystemEvents.DisplaySettingsChanged -= DisplayChanged;
             SystemEvents.UserPreferenceChanged -= PreferenceChanged;
             if (timer != null) timer.Stop();

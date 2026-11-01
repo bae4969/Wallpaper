@@ -87,7 +87,8 @@ namespace Wallpaper
 
         public bool IsAlive
         {
-            get { return !stopping && Native.IsWindow(progman) && Native.IsWindow(Outer) && Native.GetParent(Outer) == progman && thread.IsAlive; }
+            get { return !stopping && Native.IsWindow(progman) && Native.IsWindow(Outer) && Native.GetParent(Outer) == progman &&
+                Native.IsWindow(surface.Handle) && Native.GetParent(surface.Handle) == Outer && thread.IsAlive; }
         }
 
         private IntPtr Outer { get { return holder != null ? holder.Handle : surface.Handle; } }
@@ -340,9 +341,11 @@ namespace Wallpaper
             }
             catch (Exception error)
             {
-                Trace.WriteLine("WallpaperScene: " + error);
-                SceneLibrary.LogError("렌더 스레드 중단 " + bounds + ": " + error.GetType().Name + ": " + error.Message);
                 stopping = true;
+                Trace.WriteLine("WallpaperScene: " + error);
+                SceneLibrary.LogError("렌더 스레드 중단 " + bounds + " frame=" + FrameCount +
+                    " HRESULT=0x" + error.HResult.ToString("X8", CultureInfo.InvariantCulture) +
+                    " 장치 상태=" + (device == null ? "없음" : device.DeviceRemovedReason.ToString()) + ": " + error);
             }
             finally
             {
@@ -383,7 +386,9 @@ namespace Wallpaper
             DrawWidgets(time);
             if (swapChain == null) return;
             context.CopyResource(backBuffer, Output);
-            swapChain.Present(1, PresentFlags.None);
+            // 전체 화면·디스플레이 전환 뒤 장치가 초기화되면 실패한다. 실패를 무시하면 검은 화면인 채 스레드만 계속 돈다.
+            // 예외로 렌더 스레드를 끝내야 CheckDesktop이 장치와 배경 창을 다시 만든다.
+            swapChain.Present(1, PresentFlags.None).CheckError();
         }
 
         private void DrawWidgets(float time)

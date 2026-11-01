@@ -23,6 +23,8 @@ namespace Wallpaper
         public static string LayersFolder { get { return Path.Combine(Root, "layers"); } }
         public static string ScenesFolder { get { return Path.Combine(Root, "scenes"); } }
         public static string ErrorLog { get { return Path.Combine(Root, "errors.log"); } }
+        private const int LogLimit = 5 * 1024 * 1024;
+        private static readonly object logGate = new object();
 
         private static string ManifestPath { get { return Path.Combine(Root, ".defaults"); } }
 
@@ -228,10 +230,34 @@ namespace Wallpaper
             try
             {
                 Directory.CreateDirectory(Root);
-                File.AppendAllText(ErrorLog, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + "  " + message + Environment.NewLine, Encoding.UTF8);
+                WriteLog(ErrorLog, message);
             }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
+        }
+
+        // 5 MiB를 넘기기 전에 오래된 줄을 버리고 최근 약 절반을 남긴다. 같은 파일의 읽기·쓰기를 함께 잠근다.
+        private static void WriteLog(string path, string message)
+        {
+            if (message.Length > 65536) message = message.Substring(0, 65536) + "…(긴 로그 생략)";
+            var entry = Encoding.UTF8.GetBytes(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture) + "  " + message + Environment.NewLine);
+            lock (logGate)
+            using (var file = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read))
+            {
+                if (file.Length + entry.Length > LogLimit)
+                {
+                    var tail = new byte[(int)Math.Min(file.Length, LogLimit / 2)];
+                    file.Position = file.Length - tail.Length;
+                    file.ReadExactly(tail);
+                    int start = Array.IndexOf(tail, (byte)'\n');
+                    start = start < 0 ? tail.Length : start + 1;
+                    file.Position = 0;
+                    file.Write(tail, start, tail.Length - start);
+                    file.SetLength(file.Position);
+                }
+                file.Position = file.Length;
+                file.Write(entry, 0, entry.Length);
+            }
         }
 
         // 폴더 안 파일이 바뀌면 잠시 기다렸다가 한 번 알린다(편집기가 여러 번 저장해도 한 번만).
