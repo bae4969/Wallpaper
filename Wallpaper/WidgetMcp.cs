@@ -71,19 +71,23 @@ namespace Wallpaper
     internal sealed class WidgetMcpRegistry
     {
         private readonly WidgetMcpContext context;
+        private readonly DesktopMcpContext desktop;
         public readonly List<IWidgetMcpFeature> Features = new List<IWidgetMcpFeature>();
 
-        public WidgetMcpRegistry(WidgetMcpContext context)
+        public WidgetMcpRegistry(WidgetMcpContext context, DesktopMcpContext desktop = null)
         {
             this.context = context;
+            this.desktop = desktop;
             Features.Add(new MemoMcpFeature(context));
             Features.Add(new PcMcpFeature(context));
+            if (desktop != null) Features.Add(new DesktopMcpTools(desktop));
         }
 
         public void Register(IMcpServerBuilder builder)
         {
             builder.WithTools(this);
             foreach (var feature in Features) feature.Register(builder);
+            if (desktop != null) builder.WithTools(new SceneMcpTools(desktop));
         }
 
         [McpServerTool(Name = "widgets_list", ReadOnly = true, OpenWorld = false)]
@@ -105,7 +109,7 @@ namespace Wallpaper
                             placement = m.Placement == null ? null : new
                             {
                                 x = m.Placement.X, y = m.Placement.Y, scale = m.Placement.Scale,
-                                width = m.Placement.Width, height = m.Placement.Height
+                                width = m.Placement.Width, height = m.Placement.Height, contentAnchored = m.Placement.ContentAnchored
                             }
                         }).ToArray()
                     }).ToArray()
