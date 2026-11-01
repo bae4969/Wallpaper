@@ -81,7 +81,7 @@ GPU 3D 엔진 사용률(2026-10-13 측정, 메인 3440×1440 + 서브 1920×1200
 
 ## 로컬 MCP 연결
 
-앱이 실행되는 동안 로컬 AI 도구에서 위젯 목록·메모·PC 상태를 사용할 수 있습니다. 앱 안의 MCP 서버 하나에 연결하며, 위젯별 기능은 아래 도구로 제공합니다.
+앱이 실행되는 동안 로컬 AI 도구에서 배경 장면을 제작·미리보기·적용하고 위젯을 구성할 수 있습니다. 앱 안의 MCP 서버 하나에 연결하며, 기존 메모·PC 조회를 포함해 17개 도구를 제공합니다.
 
 | 도구 | 입력 | 동작 |
 | --- | --- | --- |
@@ -89,8 +89,29 @@ GPU 3D 엔진 사용률(2026-10-13 측정, 메인 3440×1440 + 서브 1920×1200
 | `memo_read` | `widgetId` | 기존 메모의 `text`와 내용 버전 `revision` 조회. 화면에서 숨긴 메모도 지원 |
 | `memo_write` | `widgetId`, `text`, `expectedRevision` | 기존 메모 본문 교체·저장·모든 화면에 반영. 먼저 읽은 `revision`을 `expectedRevision`으로 전달 |
 | `pc_read` | `widgetId`(선택) | 하드웨어 위젯의 로컬·SSH PC 또는 시스템 상태 스크립트 위젯의 로컬 PC 조회. 생략하면 로컬 PC 조회 |
+| `desktop_read` | 없음 | 현재 `sceneId`, 연결된 모니터의 `Id`·`Device`·`Main`·픽셀 영역, 배경 창 생성 여부(`SceneReady`), 생성·실패한 위젯 ID 조회 |
+| `scenes_list` | 없음 | 저장된 장면의 ID·이름·설명·읽기 오류 조회 |
+| `layers_list` | 없음 | 설치된 레이어 종류와 파라미터·기본값·선택값 조회 |
+| `scene_read` | `sceneId` | 원본 JSON과 `revision` 조회. 잘못된 JSON도 읽어서 수정 가능 |
+| `scene_write` | `sceneId`, `json`, `expectedRevision` | 메인·서브 레이어를 컴파일 검사한 뒤 장면 생성·수정. 새 ID는 빈 revision, 수정은 읽은 revision 사용 |
+| `scene_preview` | `sceneId`, `monitorId`·`time`·`width`(선택) | 지정 모니터의 실제 배치를 반영한 PNG를 MCP 이미지로 반환. 기본은 메인·3초·폭 960px, 위젯 제외 |
+| `scene_apply` | `sceneId`, `expectedRevision`, `expectedCurrentScene` | 장면을 모든 모니터에 적용·저장. 현재 배경은 `desktop_read`의 `sceneId`로 확인. 장면 ID와 revision을 빈 문자열로 주면 Windows 배경으로 복귀 |
+| `widget_types` | 없음 | 생성할 수 있는 위젯 종류와 설정 항목·기본값·범위·선택지 조회 |
+| `widget_read` | `widgetId` | `state`(설정 값·모니터별 배치), `revision`, `parameters` 조회. 메모 본문 포함, SSH 연결 정보 제외 |
+| `widget_create` | `kind`, `type`·`options`(선택) | 공용 목록에 위젯 생성. `kind`는 clock/calendar/hardware/script. script는 설치된 `type`, hardware는 로컬 PC. 화면 표시는 별도 배치 요청 |
+| `widget_update` | `widgetId`, `expectedRevision`, `options` | 지정한 설정 값만 수정·저장·화면 반영. 다른 값 유지 |
+| `widget_remove` | `widgetId`, `expectedRevision` | 공용 목록과 모든 모니터에서 위젯 삭제. 메모 본문도 삭제되며 위젯 종류 파일은 유지 |
+| `widget_place` | `widgetId`, `expectedRevision`, `monitorId`, `enabled`, 위치·크기(선택) | 모니터별 표시·위치·배율·메모 크기 변경. 숨겨도 마지막 위치·크기 보존 |
 
-메모는 여러 줄·빈 문자열을 지원하며 최대 65,536자입니다. 사용자가 해당 메모의 본문이나 설정을 편집 중이거나, 읽은 뒤 내용이 바뀌었다면 쓰기를 거부합니다. 저장 실패 시 기존 내용과 화면을 복구하며, 설정 파일은 임시 파일을 완성한 뒤 교체해 보존합니다. 메모 생성·삭제와 위젯 배치·설정 변경은 이번 MCP 도구에 포함하지 않습니다.
+메모는 여러 줄·빈 문자열을 지원하며 최대 65,536자입니다. 사용자가 해당 메모의 본문이나 설정을 편집 중이거나, 읽은 뒤 내용이 바뀌었다면 쓰기를 거부합니다. 저장 실패 시 기존 내용과 화면을 복구하며, 설정 파일은 임시 파일을 완성한 뒤 교체해 보존합니다.
+
+**배경 제작 순서:** `desktop_read`로 모니터와 현재 배경을 확인하고 `layers_list`·`scene_read`로 장면을 구성합니다. 장면 JSON 형식은 [작성 안내서](Wallpapers/AUTHORING.md#3-장면-파일-scenesidjson)와 같으며, 새 ID로 `scene_write` → 모니터마다 `scene_preview` → 반환된 revision과 현재 배경 ID로 `scene_apply` 순서로 사용합니다. 적용 중인 장면을 수정하면 기존 파일 감시 기능으로 화면에도 반영되므로, 시안은 새 ID로 작성합니다. ID는 영문·숫자·하이픈·밑줄 1~100자(Windows 예약 이름 제외), JSON은 최대 262,144자, 메인 레이어 1~64개·서브 최대 64개입니다. 미리보기는 폭 64~1600px, 긴 변 최대 1600px, 시간 0~10,000,000초를 지원합니다. 새 HLSL 레이어·XAML 위젯 코드 작성과 장면 삭제는 MCP에서 제공하지 않습니다.
+
+**위젯 구성 순서:** `widget_types` → `widget_create` → `widget_place` 순서입니다. `options`의 값은 문자열이며(예: `{"seconds":"false"}`), 선택지는 `parameters.choices`의 **label**을 사용합니다. 하드웨어는 이름·갱신 간격(정수 1~60초)·CPU/RAM/GPU/VRAM/네트워크 표시와 공통 배경 설정을 지원하며, SSH 연결 설정은 기존 설정 창에서 관리합니다. 기존 위젯은 `widget_read`의 revision으로 수정·삭제·배치하고 매번 반환된 최신 revision을 사용합니다. 메모 내용을 기존 `memo_write`로 바꿔도 위젯 revision이 달라집니다.
+
+배치의 `monitorId`는 `desktop_read`의 모니터 `Id`입니다. `x`·`y`는 내용 좌상단의 모니터 내 비율(0~1)로 함께 지정하며, 실제 화면에서는 내용이 화면 안에 들어오도록 맞춥니다. `scale`은 글자 포함 배율(0.05~10), `width`·`height`는 메모 내용의 DIP 크기(함께 지정, 최대 16,384)이며 둘 다 0이면 기본 크기로 돌아갑니다. 첫 크기 지정이나 예전 창 좌표 기준 배치의 크기 변경에는 `x`·`y`도 필요합니다. 기존 배치는 `contentAnchored`로 내용 좌표 여부를 구분합니다.
+
+새 변경 도구는 레이아웃·메모·설정 편집 중이면 거부하며, 저장 실패 시 메모리와 기존 파일을 보존합니다. **저장 후 화면 반영은 별도 결과**입니다. 위젯 변경·장면 적용 응답의 `runtimeError`가 있으면 저장은 완료됐지만 화면 반영 중 오류가 난 것입니다(`widget_place`는 `widget.runtimeError`에도 포함). `desktop_read`의 `SceneReady`는 배경 창 생성 여부이며, `VisibleWidgets`는 생성된 위젯 ID, `FailedWidgets`는 생성 실패 목록입니다. 이 값들이 실제 화면의 시각적 확인을 대신하지는 않습니다.
 
 PC 상태는 CPU·RAM 사용률, RAM 사용량·전체 용량(바이트), GPU 사용률·VRAM(MiB)·온도(°C)·전력(W), 다운로드·업로드 속도(바이트/초)를 반환합니다. `sampledAt`은 UTC 측정 시각이고 `cached`는 최근 위젯 측정값 재사용 여부입니다. 위젯별 수집 간격+1초 이내의 캐시를 사용하며, 없거나 오래됐으면 두 번 측정한 뒤 임시 수집을 멈춥니다. 임시 수집은 한 번에 하나만 실행하며, 다른 요청이 측정 중이면 재시도 오류를 반환합니다. 숨긴 위젯도 요청 중에는 측정합니다. 연결 실패는 `error`, GPU 수집 실패는 `gpuError`에 담고 측정할 수 없는 수치는 `null`입니다. GPU 표시를 끈 하드웨어 위젯의 캐시에는 GPU 정보가 없을 수 있습니다. 추이 이력은 저장하지 않습니다.
 
@@ -114,7 +135,7 @@ URL과 사용자 지정 헤더를 지원하는 로컬 MCP 클라이언트에 위
 
 ### 위젯 기능 확장
 
-`WidgetMcp.cs`의 `IWidgetMcpFeature`에 지원 위젯 판별(`Supports`), 도구 이름(`Tools`), SDK 도구 등록(`Register`)을 구현하고 `WidgetMcpRegistry.Features`에 추가합니다. 기본 구현은 메모와 PC 상태입니다. 등록한 기능은 `widgets_list`의 해당 위젯 도구 목록에도 나타납니다. 공통 서버의 인증·시작·종료 처리는 `LocalMcpServer.cs`, 실제 앱의 저장·화면 연결은 `ClockApplication.Mcp.cs`에서 담당합니다.
+`WidgetMcp.cs`의 `IWidgetMcpFeature`에 지원 위젯 판별(`Supports`), 도구 이름(`Tools`), SDK 도구 등록(`Register`)을 구현하고 `WidgetMcpRegistry.Features`에 추가합니다. 기본 구현은 메모·PC 상태·위젯 관리입니다. 등록한 기능은 `widgets_list`의 해당 위젯 도구 목록에도 나타납니다. 공통 서버의 인증·시작·종료 처리는 `LocalMcpServer.cs`, 실제 앱의 저장·화면 연결은 `ClockApplication.Mcp.cs`, 모니터·위젯 관리는 `DesktopMcp.cs`, 장면 제작·미리보기·적용은 `SceneMcp.cs`에서 담당합니다.
 
 위젯 상태 접근·변경은 `WidgetMcpContext.OnUi`를 통해 UI 스레드에서 처리하고, PC 측정처럼 기다리는 작업은 UI 스레드 밖에서 수행합니다. 새 기능도 앱과 같은 상태·저장 경로를 사용하며, 스크립트 위젯 폴더의 임의 코드를 서버에서 실행하지 않습니다.
 
@@ -157,5 +178,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Wallpaper\build.ps1
 메모 편집창은 2026-10-26 별도 WPF 창에서 Esc·바깥 클릭·닫는 중 포커스 해제·저장 실패 후 재시도·변경 없는 종료·직접 닫기·자동 저장 후 종료를 검증했습니다. 닫는 중 포커스 해제를 주입하면 발생하던 중복 닫기 예외를 수정한 뒤 7개 시나리오가 통과했고, 설치본 교체 후 사용자가 실제 Esc 종료 문제의 해결을 확인했습니다.
 
 로컬 MCP는 2026-11-01 커밋 대상 소스만 격리한 로컬 검사 37개가 통과했습니다. 인증·Host·Origin 검사, 메모 충돌·저장 실패 복구, 두 WPF 뷰의 렌더 반영, 로컬·실제 SSH PC 수집, 취소·종료와 기능 확장을 확인했습니다. 같은 소스의 단일 exe로 장면 16개·스크립트 위젯 3개 검사도 통과했고, 설치본을 Codex에 연결해 실제 메모 쓰기·재읽기와 내용 비우기를 확인했습니다. 격리 WPF 렌더와 MCP 호출 검증은 실제 바탕화면의 포커스·시각적 배치 검증과 구분됩니다.
+
+배경 제작·위젯 관리 확장은 별도 HTTP MCP 서버·임시 설정/장면 폴더에서 68개 검사가 통과했습니다. 17개 도구 검색, 생성·수정·다중 모니터 배치·숨김·삭제·설정 재로드, 두 메모 WPF 뷰의 렌더 변경, 메인·아래·왼쪽 모니터 PNG, 동시 수정 충돌과 실제 파일 잠금 시 원본 보존을 확인했습니다. 종류 파일이 사라진 위젯도 상태를 조회해 삭제할 수 있습니다. 장면 적용은 격리된 상태와 갱신 콜백으로 검증했습니다. 실제 앱 창 생성 검사는 실행 환경의 창 핸들 생성 오류로 진행하지 못했고, native UI 연결도 없어 실제 바탕화면의 배치·배경 적용을 직접 확인하지 못했습니다. 이 확장 버전의 설치본 반영과 현재 대화에서의 새 도구 검색은 별도 확인이 필요합니다.
 
 위젯 창은 Windows 셸의 바탕화면 계층(`WorkerW`/`Progman`)을 사용합니다. 다른 Windows 빌드는 해당 PC에서 확인이 필요합니다.

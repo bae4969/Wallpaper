@@ -303,13 +303,17 @@ namespace Wallpaper
 
         public static SceneDefinition Load(string path)
         {
-            using (var document = JsonDocument.Parse(File.ReadAllText(path, Encoding.UTF8), new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }))
+            return Parse(File.ReadAllText(path, Encoding.UTF8), Path.GetFileNameWithoutExtension(path));
+        }
+
+        public static SceneDefinition Parse(string text, string id)
+        {
+            using (var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }))
             {
                 var root = document.RootElement;
                 JsonElement layers, name, description;
                 if (!root.TryGetProperty("layers", out layers) || layers.ValueKind != JsonValueKind.Array)
                     throw new InvalidDataException("\"layers\" 배열이 없습니다.");
-                var id = Path.GetFileNameWithoutExtension(path);
                 var scene = new SceneDefinition
                 {
                     Id = id,
