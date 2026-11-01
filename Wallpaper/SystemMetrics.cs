@@ -15,6 +15,7 @@ namespace Wallpaper
 
     internal sealed class HardwareSnapshot
     {
+        public DateTimeOffset CapturedAt = DateTimeOffset.UtcNow;
         public string Error;
         public SystemSnapshot System = new SystemSnapshot();
         public GpuSnapshot Gpu = new GpuSnapshot();

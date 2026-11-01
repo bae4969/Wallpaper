@@ -41,7 +41,8 @@ namespace Wallpaper
                 try
                 {
                     var app = new ClockApplication();
-                    app.Run();
+                    try { app.Run(); }
+                    finally { app.WaitForMcpExit(); }
                 }
                 catch (Exception error)
                 {
@@ -53,7 +54,7 @@ namespace Wallpaper
         }
     }
 
-    internal sealed class ClockApplication : Application, ISettingsHost
+    internal sealed partial class ClockApplication : Application, ISettingsHost
     {
         // 연결된 모니터마다 배경과 그 화면에 놓인 위젯 창. 키는 장치 이름. 위젯 목록 자체는 모든 화면 공용(preferences.Widgets).
         private readonly Dictionary<string, MonitorRuntime> monitors = new Dictionary<string, MonitorRuntime>();
@@ -152,6 +153,7 @@ namespace Wallpaper
             timer.Start();
             SystemEvents.DisplaySettingsChanged += DisplayChanged;
             SystemEvents.UserPreferenceChanged += PreferenceChanged;
+            StartMcp();
         }
 
         // 트레이 등록(Shell_NotifyIcon). 로그인·탐색기 재시작 직후에는 거부될 수 있어 3초 뒤 한 번 더 시도하고 실패를 기록한다.
@@ -823,7 +825,9 @@ namespace Wallpaper
             }
             var parameters = (own ?? new WidgetParameter[0]).Concat(BuiltInWidgetOptions.Common).ToArray();
             var window = new WidgetOptionsWindow(WidgetNames()[widget.Id], parameters, widget.Options, () => ApplyOptions(widget)) { Owner = DialogOwner };
-            window.ShowDialog();
+            optionsEditingId = widget.Id;
+            try { window.ShowDialog(); }
+            finally { optionsEditingId = null; }
             SavePreferences();
         }
 
@@ -1104,6 +1108,7 @@ namespace Wallpaper
         protected override void OnExit(ExitEventArgs e)
         {
             shuttingDown = true;
+            mcpStopping.Cancel();
             if (memoInput != null) memoInput.Dispose();
             if (memoEditor != null) memoEditor.Close();
             SystemEvents.DisplaySettingsChanged -= DisplayChanged;

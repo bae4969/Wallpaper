@@ -98,11 +98,15 @@ namespace Wallpaper
         public void Save(string path)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            new XElement("settings",
+            var document = new XElement("settings",
                 new XElement("performance", new XAttribute("fps", FrameLimit), new XAttribute("scale", RenderScale.ToString(CultureInfo.InvariantCulture)),
                     new XAttribute("quality", EffectQuality.ToString(CultureInfo.InvariantCulture)), new XAttribute("pauseCovered", PauseWhenCovered), new XAttribute("pauseBattery", PauseOnBattery)),
                 new XElement("scene", new XAttribute("id", Scene), new XAttribute("main", MainDisplay)),
-                new XElement("widgets", Widgets.Select(WriteWidget))).Save(path);
+                new XElement("widgets", Widgets.Select(WriteWidget)));
+            // 저장 실패 시 기존 파일이 잘리지 않도록 같은 폴더에서 완성한 뒤 교체한다.
+            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try { document.Save(temporary); File.Move(temporary, path, true); }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
 
         // <widget id kind [type] [하드웨어 속성…]><option/>…<monitor key device enabled x y scale anchor/>…</widget>
